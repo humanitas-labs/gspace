@@ -21,6 +21,7 @@
 - [x] Implement `gmail label ls|add|rm` against Gmail API labels and message modify endpoints.
 - [x] Add `gmail send --reply <id> --draft-file <path>` with thread-aware reply headers.
 - [x] Add repeatable `--attach <path>` support for sending attachments.
+- [x] Improve `gmail label ls` text output to print formatted labels without `--json`.
 
 ### Testing Checklist
 
@@ -41,6 +42,7 @@
 - [x] `cargo fmt && cargo check && cargo test` after html-escape integration
 - [x] `cargo run -- send --to jane@example.com --subject "gmail-cli send test" --body "..."`
 - [x] `cargo run -- --json label ls`
+- [x] `cargo run -- label ls` (verified formatted text output)
 - [x] `cargo run -- label add 19c6880b2c6d1ea7 Invoices && cargo run -- label rm 19c6880b2c6d1ea7 Invoices`
 - [x] `cargo run -- send --to jane@example.com --subject "gmail-cli attachment test" --body "..." --attach /tmp/gmail-cli-attach-test.txt`
 - [x] `cargo run -- send --reply 19c6880b2c6d1ea7 --draft-file /tmp/gmail-cli-reply-draft.txt --to jane@example.com`
