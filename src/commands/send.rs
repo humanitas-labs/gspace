@@ -63,12 +63,6 @@ async fn build_reply_request(
     attachments: Vec<Attachment>,
     reply_id: &str,
 ) -> AppResult<SendRequest> {
-    if args.draft_file.is_none() {
-        return Err(AppError::InvalidInput(
-            "--reply requires --draft-file".to_string(),
-        ));
-    }
-
     let parent = ctx.gmail_client.get_msg(reply_id, access_token).await?;
     let mut to = args.to;
     if to.is_empty() {
