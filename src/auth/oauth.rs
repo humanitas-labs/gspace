@@ -22,7 +22,7 @@ const GOOGLE_TOKEN_ENDPOINT: &str = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_ENDPOINT: &str = "https://oauth2.googleapis.com/revoke";
 const GOOGLE_USERINFO_ENDPOINT: &str = "https://openidconnect.googleapis.com/v1/userinfo";
 const OAUTH_CALLBACK_TIMEOUT_SECS: u64 = 180;
-const OAUTH_SCOPES: &str = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send openid email";
+const OAUTH_SCOPES: &str = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send openid email profile";
 
 #[derive(Debug, Serialize)]
 pub struct AuthLoginResult {
@@ -73,8 +73,9 @@ impl AuthService {
         .await?;
 
         let mut token = exchange_auth_code(&oauth, &code, &flow.code_verifier).await?;
-        if let Ok(email) = fetch_email(&token.access_token).await {
-            token.email = email;
+        if let Ok(profile) = fetch_user_profile(&token.access_token).await {
+            token.email = profile.email;
+            token.name = profile.name;
         }
         store.save(profile, &token)?;
 
@@ -114,6 +115,9 @@ impl AuthService {
 
         if refreshed.email.is_none() {
             refreshed.email = current.email;
+        }
+        if refreshed.name.is_none() {
+            refreshed.name = current.name;
         }
 
         store.save(profile, &refreshed)?;
@@ -246,6 +250,7 @@ struct OAuthErrorResponse {
 #[derive(Debug, Deserialize)]
 struct UserInfoResponse {
     email: Option<String>,
+    name: Option<String>,
 }
 
 async fn exchange_auth_code(
@@ -295,9 +300,14 @@ async fn exchange_refresh_token(config: &OAuthConfig, refresh_token: &str) -> Ap
     if token.refresh_token.is_none() {
         token.refresh_token = Some(refresh_token.to_string());
     }
-    if token.email.is_none() {
-        if let Ok(email) = fetch_email(&token.access_token).await {
-            token.email = email;
+    if token.email.is_none() || token.name.is_none() {
+        if let Ok(profile) = fetch_user_profile(&token.access_token).await {
+            if token.email.is_none() {
+                token.email = profile.email;
+            }
+            if token.name.is_none() {
+                token.name = profile.name;
+            }
         }
     }
 
@@ -314,6 +324,7 @@ async fn parse_token_response(response: reqwest::Response) -> AppResult<TokenSet
             token_type: payload.token_type,
             scope: payload.scope,
             email: None,
+            name: None,
         });
     }
 
@@ -342,7 +353,7 @@ fn expires_at_unix(expires_in: Option<u64>) -> Option<u64> {
     Some(now.saturating_add(expires_in))
 }
 
-async fn fetch_email(access_token: &str) -> AppResult<Option<String>> {
+async fn fetch_user_profile(access_token: &str) -> AppResult<UserInfoResponse> {
     let response = reqwest::Client::new()
         .get(GOOGLE_USERINFO_ENDPOINT)
         .bearer_auth(access_token)
@@ -350,11 +361,14 @@ async fn fetch_email(access_token: &str) -> AppResult<Option<String>> {
         .await?;
 
     if !response.status().is_success() {
-        return Ok(None);
+        return Ok(UserInfoResponse {
+            email: None,
+            name: None,
+        });
     }
 
     let payload: UserInfoResponse = response.json().await?;
-    Ok(payload.email)
+    Ok(payload)
 }
 
 async fn revoke_token(token: &str) -> AppResult<()> {
@@ -573,36 +587,4 @@ fn escape_html(input: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_callback_code() {
-        let code = extract_callback_code("/callback?code=abc123&state=xyz", "/callback", "xyz")
-            .expect("callback should parse");
-        assert_eq!(code, "abc123");
-    }
-
-    #[test]
-    fn rejects_state_mismatch() {
-        let result =
-            extract_callback_code("/callback?code=abc123&state=wrong", "/callback", "expected");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn builds_pkce_challenge() {
-        let verifier = "test_verifier_value";
-        let challenge = pkce_challenge(verifier);
-        assert!(!challenge.is_empty());
-    }
-
-    #[test]
-    fn random_token_is_non_empty() {
-        let token = random_token(32);
-        assert!(token.len() >= 43);
-    }
 }

@@ -1,15 +1,107 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use pulldown_cmark::{Options, Parser, html};
 use rand::Rng;
 
 use crate::api::models::SendRequest;
+
+const EMAIL_HTML_TEMPLATE: &str = r#"<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #202124;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .email-body {
+      margin: 0;
+      padding: 0;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.3;
+      margin-top: 1.2em;
+      margin-bottom: 0.5em;
+    }
+    p, ul, ol, pre, blockquote, table {
+      margin-top: 0;
+      margin-bottom: 1em;
+    }
+    a {
+      color: #0b57d0;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    pre {
+      background: #f1f3f5;
+      border-radius: 8px;
+      overflow-x: auto;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    blockquote {
+      margin-left: 0;
+      padding-left: 12px;
+      border-left: 3px solid #d0d7de;
+      color: #5f6368;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      display: block;
+      overflow-x: auto;
+    }
+    th, td {
+      border: 1px solid #d0d7de;
+      padding: 6px 8px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-body">
+__BODY__
+  </div>
+</body>
+</html>
+"#;
+
+pub fn markdown_to_html(body_markdown: &str) -> String {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_FOOTNOTES);
+
+    let parser = Parser::new_ext(body_markdown, options);
+    let mut body_html = String::new();
+    html::push_html(&mut body_html, parser);
+
+    if body_html.trim().is_empty() {
+        body_html.push_str("<p></p>");
+    }
+
+    EMAIL_HTML_TEMPLATE.replacen("__BODY__", &body_html, 1)
+}
 
 pub fn build_raw_message(request: &SendRequest) -> String {
     let mut headers = build_base_headers(request);
 
     let payload = if request.attachments.is_empty() {
-        headers.push("Content-Type: text/plain; charset=utf-8".to_string());
+        headers.push("Content-Type: text/html; charset=utf-8".to_string());
         format!("{}\r\n\r\n{}", headers.join("\r\n"), request.body)
     } else {
         let boundary = random_boundary();
@@ -28,6 +120,11 @@ pub fn build_raw_message(request: &SendRequest) -> String {
 
 fn build_base_headers(request: &SendRequest) -> Vec<String> {
     let mut headers = Vec::new();
+
+    if let Some(from) = &request.from {
+        headers.push(format!("From: {from}"));
+    }
+
     headers.push(format!("To: {}", request.to.join(", ")));
 
     if !request.cc.is_empty() {
@@ -39,6 +136,7 @@ fn build_base_headers(request: &SendRequest) -> Vec<String> {
     }
 
     headers.push(format!("Subject: {}", request.subject));
+    headers.push("MIME-Version: 1.0".to_string());
     if let Some(in_reply_to) = &request.in_reply_to {
         headers.push(format!("In-Reply-To: {in_reply_to}"));
     }
@@ -52,7 +150,7 @@ fn build_base_headers(request: &SendRequest) -> Vec<String> {
 fn multipart_body(request: &SendRequest, boundary: &str) -> String {
     let mut out = String::new();
     out.push_str(&format!("--{boundary}\r\n"));
-    out.push_str("Content-Type: text/plain; charset=utf-8\r\n\r\n");
+    out.push_str("Content-Type: text/html; charset=utf-8\r\n\r\n");
     out.push_str(&request.body);
     out.push_str("\r\n");
 
@@ -99,58 +197,4 @@ fn random_boundary() -> String {
 
 fn escape_header_value(value: &str) -> String {
     value.replace('"', "")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::models::{Attachment, SendRequest};
-
-    #[test]
-    fn includes_reply_headers() {
-        let request = SendRequest {
-            to: vec!["dev@example.com".to_string()],
-            cc: vec![],
-            bcc: vec![],
-            subject: "Re: Test".to_string(),
-            body: "Hello".to_string(),
-            in_reply_to: Some("<id@example.com>".to_string()),
-            references: Some("<ref@example.com> <id@example.com>".to_string()),
-            thread_id: None,
-            attachments: vec![],
-        };
-
-        let raw = build_raw_message(&request);
-        let decoded = String::from_utf8(URL_SAFE_NO_PAD.decode(raw).expect("base64 decode"))
-            .expect("utf8 payload");
-
-        assert!(decoded.contains("In-Reply-To: <id@example.com>"));
-        assert!(decoded.contains("References: <ref@example.com> <id@example.com>"));
-    }
-
-    #[test]
-    fn builds_multipart_when_attachments_exist() {
-        let request = SendRequest {
-            to: vec!["dev@example.com".to_string()],
-            cc: vec![],
-            bcc: vec![],
-            subject: "Test".to_string(),
-            body: "Hello".to_string(),
-            in_reply_to: None,
-            references: None,
-            thread_id: None,
-            attachments: vec![Attachment {
-                filename: "a.txt".to_string(),
-                mime_type: "text/plain".to_string(),
-                data: b"hello attachment".to_vec(),
-            }],
-        };
-
-        let raw = build_raw_message(&request);
-        let decoded = String::from_utf8(URL_SAFE_NO_PAD.decode(raw).expect("base64 decode"))
-            .expect("utf8 payload");
-
-        assert!(decoded.contains("multipart/mixed"));
-        assert!(decoded.contains("Content-Disposition: attachment; filename=\"a.txt\""));
-    }
 }

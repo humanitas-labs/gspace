@@ -12,6 +12,8 @@ Rust scaffold for a Gmail CLI with this command shape:
 
 OAuth login is wired with browser auth code flow + PKCE and local callback capture.
 `gmail list`, `gmail get`, `gmail send`, and `gmail label` are wired to the real Gmail API.
+`gmail send` treats body input as Markdown and sends rendered `text/html` by default.
+`gmail send` also sets `From` with a display name when available (`sender_name` profile setting or Google profile name captured at login).
 
 ## Current command tree
 
@@ -50,7 +52,8 @@ See `docs/architecture.md` for data flow and implementation phases.
 {
   "client_id": "YOUR_CLIENT_ID",
   "client_secret": "YOUR_CLIENT_SECRET",
-  "redirect_uri": "http://127.0.0.1:8787/callback"
+  "redirect_uri": "http://127.0.0.1:8787/callback",
+  "sender_name": "Jane Doe"
 }
 ```
 
@@ -90,7 +93,7 @@ cargo check
 cargo run -- auth status
 cargo run -- list --inbox --limit 3
 cargo run -- get <message-id>
-cargo run -- send --to dev@example.com --subject "hello" --body "hi"
+cargo run -- send --to dev@example.com --subject "hello" --body "**hi** from _markdown_"
 cargo run -- send --to dev@example.com --subject "with attachment" --body "see attached" --attach ./file.pdf
 cargo run -- send --reply <message-id> --draft-file ./reply.txt --to dev@example.com
 cargo run -- label ls

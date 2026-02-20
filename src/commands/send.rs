@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 
 use crate::api::models::{Attachment, SendRequest};
+use crate::auth::token_store::TokenStore;
 use crate::cli::SendArgs;
 use crate::context::AppContext;
 use crate::error::{AppError, AppResult};
@@ -25,8 +26,10 @@ async fn build_send_request(
     access_token: &str,
     args: SendArgs,
 ) -> AppResult<SendRequest> {
-    let body = read_body(&args)?;
+    let body_markdown = read_body(&args)?;
+    let body = mime::markdown_to_html(&body_markdown);
     let attachments = read_attachments(&args.attach)?;
+    let from = resolve_from_header(ctx)?;
 
     if let Some(reply_id) = args.reply.clone() {
         return build_reply_request(ctx, access_token, args, body, attachments, &reply_id).await;
@@ -43,6 +46,7 @@ async fn build_send_request(
     })?;
 
     Ok(SendRequest {
+        from,
         to: args.to,
         cc: args.cc,
         bcc: args.bcc,
@@ -87,6 +91,7 @@ async fn build_reply_request(
     let references = merge_references(parent.references, in_reply_to.clone());
 
     Ok(SendRequest {
+        from: resolve_from_header(ctx)?,
         to,
         cc: args.cc,
         bcc: args.bcc,
@@ -97,6 +102,46 @@ async fn build_reply_request(
         thread_id: parent.thread_id,
         attachments,
     })
+}
+
+fn resolve_from_header(ctx: &AppContext) -> AppResult<Option<String>> {
+    let token = ctx.token_store.load(&ctx.profile)?;
+    let Some(token) = token else {
+        return Ok(None);
+    };
+
+    let email = token
+        .email
+        .as_deref()
+        .map(sanitize_header_value)
+        .filter(|value| !value.is_empty());
+    let name = ctx
+        .settings
+        .sender_name
+        .as_deref()
+        .map(sanitize_header_value)
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            token
+                .name
+                .as_deref()
+                .map(sanitize_header_value)
+                .filter(|value| !value.is_empty())
+        });
+
+    match (name, email) {
+        (Some(name), Some(email)) => Ok(Some(format!("{name} <{email}>"))),
+        (None, Some(email)) => Ok(Some(email)),
+        _ => Ok(None),
+    }
+}
+
+fn sanitize_header_value(input: &str) -> String {
+    input
+        .trim()
+        .chars()
+        .filter(|value| *value != '\r' && *value != '\n' && *value != '"')
+        .collect()
 }
 
 fn read_body(args: &SendArgs) -> AppResult<String> {

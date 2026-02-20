@@ -15,6 +15,8 @@ pub struct Settings {
     pub client_secret: Option<String>,
     #[serde(default)]
     pub redirect_uri: Option<String>,
+    #[serde(default)]
+    pub sender_name: Option<String>,
 }
 
 impl Settings {

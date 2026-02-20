@@ -16,6 +16,7 @@ pub struct MessageView {
 
 #[derive(Debug, Clone)]
 pub struct SendRequest {
+    pub from: Option<String>,
     pub to: Vec<String>,
     pub cc: Vec<String>,
     pub bcc: Vec<String>,

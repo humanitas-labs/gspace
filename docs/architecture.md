@@ -46,7 +46,7 @@ Provide a composable Rust CLI named `gmail` with stable command UX first, then l
 - Token endpoint: `https://oauth2.googleapis.com/token`
 - Revoke endpoint: `https://oauth2.googleapis.com/revoke`
 - Userinfo endpoint: `https://openidconnect.googleapis.com/v1/userinfo`
-- Scopes: `gmail.modify`, `gmail.send`, `openid`, `email`
+- Scopes: `gmail.modify`, `gmail.send`, `openid`, `email`, `profile`
 - Redirect URI: profile setting `redirect_uri`, default `http://127.0.0.1:8787/callback`
 - Token refresh: `AppContext::access_token` auto-refreshes expired access tokens when refresh token exists.
 

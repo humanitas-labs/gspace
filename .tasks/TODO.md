@@ -56,3 +56,17 @@
 - Package/install flow (`cargo install --path .`) and release automation.
 - Richer list/get formatting options (columns, pager, compact mode).
 - More advanced attachment controls (display name/content-type overrides).
+
+## 2026-02-20
+
+### Stack
+
+- [x] Implement markdown-to-HTML default `gmail send` body handling.
+- [x] Consolidate tests under `tests/` and remove inline `src/` test modules.
+- [x] Adjust HTML template to normal Gmail-like layout (remove centered card).
+- [x] Set explicit `From` header with display name/email identity.
+- [x] Bump CLI patch version to `0.1.1` and reinstall globally.
+
+### Heap
+
+- [ ] Evaluate richer text/plain fallback strategy for HTML emails.

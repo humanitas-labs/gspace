@@ -10,6 +10,7 @@ pub struct TokenSet {
     pub token_type: Option<String>,
     pub scope: Option<String>,
     pub email: Option<String>,
+    pub name: Option<String>,
 }
 
 impl TokenSet {
