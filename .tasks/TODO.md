@@ -70,3 +70,24 @@
 ### Heap
 
 - [ ] Evaluate richer text/plain fallback strategy for HTML emails.
+
+## 2026-06-30
+
+### Stack
+
+- [x] Add `gmail attachments ls|get <id>` to download message attachments.
+      Motivation: CLI could see messages via `get`/`list` but had no way to pull
+      attachments (hit while trying to fetch emailed PDFs). Adds a
+      `full`-format fetch + MIME-tree walk (`list_attachments`) and
+      `messages.attachments.get` byte download (`get_attachment`) in the API
+      layer, plus an `attachments` subcommand mirroring the `label` shape.
+      `get` supports `--out <dir>`, `--index <n>`, `--name <file>`; filenames are
+      sanitized to `file_name()` to prevent path traversal.
+
+### Testing Checklist
+
+- [x] `cargo fmt && cargo check && cargo test` (added attachment-collection +
+      base64url decode unit tests in `tests/api_client.rs`)
+- [x] `cargo run -- attachments ls <id>` (live: messages with PDF attachments)
+- [x] `cargo run -- attachments get <id> --out ~/Downloads/gmail-attachments`
+      (live: 4 resumes downloaded, verified as valid PDFs, byte-exact sizes)

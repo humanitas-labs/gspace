@@ -17,6 +17,7 @@ pub struct AppContext {
 }
 
 impl AppContext {
+    /// Resolve paths, settings, token store, client, and output mode into an app context.
     pub fn bootstrap(profile: String, json: bool, verbose: u8) -> AppResult<Self> {
         let profile = config::resolve_profile(&profile);
         let paths = AppPaths::discover()?;
@@ -36,6 +37,7 @@ impl AppContext {
         })
     }
 
+    /// Return a valid access token, refreshing it if the stored one has expired.
     pub async fn access_token(&self) -> AppResult<String> {
         let token = self.token_store.load(&self.profile)?.ok_or_else(|| {
             AppError::InvalidInput("not logged in. run `gmail auth login`".to_string())

@@ -8,6 +8,7 @@ use crate::context::AppContext;
 use crate::error::{AppError, AppResult};
 use crate::mail::mime;
 
+/// Build a send request from the args, encode it as a raw message, and submit it.
 pub async fn run(ctx: &AppContext, args: SendArgs) -> AppResult<()> {
     let access_token = ctx.access_token().await?;
     let request = build_send_request(ctx, &access_token, args).await?;
@@ -21,6 +22,8 @@ pub async fn run(ctx: &AppContext, args: SendArgs) -> AppResult<()> {
     ctx.output.emit(&text, &result)
 }
 
+/// Assemble a `SendRequest` from args, rendering the markdown body and reading attachments;
+/// delegates to the reply path when `--reply` is set.
 async fn build_send_request(
     ctx: &AppContext,
     access_token: &str,
@@ -59,6 +62,7 @@ async fn build_send_request(
     })
 }
 
+/// Build a reply by fetching the parent message and deriving recipient, subject, threading headers.
 async fn build_reply_request(
     ctx: &AppContext,
     access_token: &str,
@@ -104,6 +108,7 @@ async fn build_reply_request(
     })
 }
 
+/// Build a `From` header from the stored token's email and the configured or token display name.
 fn resolve_from_header(ctx: &AppContext) -> AppResult<Option<String>> {
     let token = ctx.token_store.load(&ctx.profile)?;
     let Some(token) = token else {
@@ -136,6 +141,7 @@ fn resolve_from_header(ctx: &AppContext) -> AppResult<Option<String>> {
     }
 }
 
+/// Strip CR, LF, and quote characters to prevent header injection.
 fn sanitize_header_value(input: &str) -> String {
     input
         .trim()
@@ -144,6 +150,7 @@ fn sanitize_header_value(input: &str) -> String {
         .collect()
 }
 
+/// Read the message body from exactly one of --body, --body-file, --draft-file, or --stdin.
 fn read_body(args: &SendArgs) -> AppResult<String> {
     let mut selected = 0;
 
@@ -190,6 +197,7 @@ fn read_body(args: &SendArgs) -> AppResult<String> {
     Ok(body)
 }
 
+/// Read each attachment path into bytes, inferring filename and MIME type.
 fn read_attachments(paths: &[std::path::PathBuf]) -> AppResult<Vec<Attachment>> {
     let mut attachments = Vec::new();
 
@@ -216,6 +224,7 @@ fn read_attachments(paths: &[std::path::PathBuf]) -> AppResult<Vec<Attachment>> 
     Ok(attachments)
 }
 
+/// Prefix a subject with `Re:` unless it already starts with one.
 fn ensure_reply_subject(subject: String) -> String {
     let trimmed = subject.trim();
     if trimmed.to_ascii_lowercase().starts_with("re:") {
@@ -225,6 +234,7 @@ fn ensure_reply_subject(subject: String) -> String {
     }
 }
 
+/// Append the parent's Message-ID to the existing References chain, avoiding duplicates.
 fn merge_references(existing: Option<String>, message_id: Option<String>) -> Option<String> {
     let message_id = message_id?.trim().to_string();
     if message_id.is_empty() {

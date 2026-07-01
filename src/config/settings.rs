@@ -20,6 +20,7 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// The OAuth client id, erroring if it is not configured.
     pub fn client_id(&self) -> AppResult<&str> {
         self.client_id.as_deref().ok_or_else(|| {
             AppError::Config(
@@ -29,10 +30,12 @@ impl Settings {
         })
     }
 
+    /// The configured OAuth client secret, if any.
     pub fn client_secret(&self) -> Option<&str> {
         self.client_secret.as_deref()
     }
 
+    /// The configured redirect URI, or the built-in loopback default.
     pub fn redirect_uri(&self) -> String {
         self.redirect_uri
             .clone()
@@ -40,6 +43,7 @@ impl Settings {
     }
 }
 
+/// Load settings from `path`, returning defaults when the file is absent.
 pub fn load(path: PathBuf) -> AppResult<Settings> {
     if !path.exists() {
         return Ok(Settings::default());
@@ -50,6 +54,7 @@ pub fn load(path: PathBuf) -> AppResult<Settings> {
     Ok(settings)
 }
 
+/// Write settings as pretty JSON to `path`, restricting it to owner-only (0600) on unix.
 pub fn save(path: PathBuf, settings: &Settings) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;

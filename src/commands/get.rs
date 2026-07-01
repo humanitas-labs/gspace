@@ -2,6 +2,7 @@ use crate::cli::GetArgs;
 use crate::context::AppContext;
 use crate::error::AppResult;
 
+/// Fetch a single message by id and emit its sender/subject summary.
 pub async fn run(ctx: &AppContext, args: GetArgs) -> AppResult<()> {
     let access_token = ctx.access_token().await?;
     let message = ctx.gmail_client.get_msg(&args.id, &access_token).await?;

@@ -49,6 +49,7 @@ pub struct AuthStatus {
 pub struct AuthService;
 
 impl AuthService {
+    /// Run the full PKCE authorization-code flow, then persist the resulting token set.
     pub async fn login<S: TokenStore>(
         profile: &str,
         settings: &Settings,
@@ -89,6 +90,7 @@ impl AuthService {
         })
     }
 
+    /// Return the stored token if still valid, otherwise exchange the refresh token and re-store it.
     pub async fn refresh<S: TokenStore>(
         profile: &str,
         settings: &Settings,
@@ -124,6 +126,7 @@ impl AuthService {
         Ok(refreshed)
     }
 
+    /// Report login state for a profile, including expiry and refresh-token availability.
     pub async fn status<S: TokenStore>(profile: &str, store: &S) -> AppResult<AuthStatus> {
         let Some(token) = store.load(profile)? else {
             return Ok(AuthStatus {
@@ -152,6 +155,7 @@ impl AuthService {
         })
     }
 
+    /// Revoke the stored token with Google (best-effort) and clear local credentials.
     pub async fn logout<S: TokenStore>(profile: &str, store: &S) -> AppResult<AuthStatus> {
         let token = store.load(profile)?;
         let note = if let Some(token) = token {
@@ -190,6 +194,7 @@ struct OAuthConfig {
 }
 
 impl OAuthConfig {
+    /// Build OAuth client config (id, secret, redirect uri) from profile settings.
     fn from_settings(settings: &Settings) -> AppResult<Self> {
         Ok(Self {
             client_id: settings.client_id()?.to_string(),
@@ -207,6 +212,7 @@ struct LoginFlow {
 }
 
 impl LoginFlow {
+    /// Generate PKCE verifier/challenge and state, then build the Google authorization URL.
     fn new(config: &OAuthConfig) -> AppResult<Self> {
         let state = random_token(32);
         let code_verifier = random_token(96);
@@ -253,6 +259,7 @@ struct UserInfoResponse {
     name: Option<String>,
 }
 
+/// Exchange an authorization code (with PKCE verifier) for a token set at the token endpoint.
 async fn exchange_auth_code(
     config: &OAuthConfig,
     code: &str,
@@ -279,6 +286,7 @@ async fn exchange_auth_code(
     parse_token_response(response).await
 }
 
+/// Exchange a refresh token for a fresh token set, backfilling refresh token and profile fields.
 async fn exchange_refresh_token(config: &OAuthConfig, refresh_token: &str) -> AppResult<TokenSet> {
     let mut form = HashMap::from([
         ("grant_type", "refresh_token".to_string()),
@@ -314,6 +322,7 @@ async fn exchange_refresh_token(config: &OAuthConfig, refresh_token: &str) -> Ap
     Ok(token)
 }
 
+/// Deserialize a token endpoint response into a `TokenSet`, or surface the OAuth error detail.
 async fn parse_token_response(response: reqwest::Response) -> AppResult<TokenSet> {
     if response.status().is_success() {
         let payload: OAuthTokenResponse = response.json().await?;
@@ -347,12 +356,14 @@ async fn parse_token_response(response: reqwest::Response) -> AppResult<TokenSet
     )))
 }
 
+/// Convert a relative `expires_in` (seconds) into an absolute unix expiry timestamp.
 fn expires_at_unix(expires_in: Option<u64>) -> Option<u64> {
     let expires_in = expires_in?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
     Some(now.saturating_add(expires_in))
 }
 
+/// Fetch the user's email and name from the OpenID userinfo endpoint (empty on failure).
 async fn fetch_user_profile(access_token: &str) -> AppResult<UserInfoResponse> {
     let response = reqwest::Client::new()
         .get(GOOGLE_USERINFO_ENDPOINT)
@@ -371,6 +382,7 @@ async fn fetch_user_profile(access_token: &str) -> AppResult<UserInfoResponse> {
     Ok(payload)
 }
 
+/// Revoke a token at Google's revoke endpoint.
 async fn revoke_token(token: &str) -> AppResult<()> {
     let response = reqwest::Client::new()
         .post(GOOGLE_REVOKE_ENDPOINT)
@@ -388,6 +400,7 @@ async fn revoke_token(token: &str) -> AppResult<()> {
     )))
 }
 
+/// Bind a local listener on the redirect URI and block until the OAuth callback delivers a code.
 async fn wait_for_auth_callback(
     redirect_uri: &str,
     expected_state: &str,
@@ -474,6 +487,7 @@ async fn wait_for_auth_callback(
     Ok(callback)
 }
 
+/// Parse the callback request target, verifying path and state and returning the auth code.
 fn extract_callback_code(
     target: &str,
     expected_path: &str,
@@ -520,6 +534,7 @@ fn extract_callback_code(
     code.ok_or_else(|| AppError::Auth("oauth callback missing code parameter".to_string()))
 }
 
+/// Write a minimal HTML response to the callback socket and close it.
 async fn write_callback_response(
     stream: &mut tokio::net::TcpStream,
     status: &str,
@@ -540,17 +555,20 @@ async fn write_callback_response(
     Ok(())
 }
 
+/// Generate `len` random bytes encoded as a base64url string.
 fn random_token(len: usize) -> String {
     let mut bytes = vec![0_u8; len];
     rand::thread_rng().fill(bytes.as_mut_slice());
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
+/// Derive the S256 PKCE challenge (base64url SHA-256) from a verifier.
 fn pkce_challenge(verifier: &str) -> String {
     let digest = Sha256::digest(verifier.as_bytes());
     URL_SAFE_NO_PAD.encode(digest)
 }
 
+/// Open a URL in the platform's default browser, returning whether the launch succeeded.
 fn open_browser(url: &str) -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -580,6 +598,7 @@ fn open_browser(url: &str) -> bool {
     false
 }
 
+/// Escape HTML metacharacters for safe inclusion in the callback response page.
 fn escape_html(input: &str) -> String {
     input
         .replace('&', "&amp;")

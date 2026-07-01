@@ -3,6 +3,7 @@ use crate::context::AppContext;
 use crate::error::AppResult;
 use crate::output::OutputMode;
 
+/// Dispatch a `gmail label` subcommand (ls/add/rm).
 pub async fn run(ctx: &AppContext, command: LabelCommand) -> AppResult<()> {
     match command {
         LabelCommand::Ls => {
@@ -40,6 +41,7 @@ pub async fn run(ctx: &AppContext, command: LabelCommand) -> AppResult<()> {
     }
 }
 
+/// Add labels to a message and emit the mutation result.
 async fn mutate_add(ctx: &AppContext, args: LabelMutateArgs) -> AppResult<()> {
     let access_token = ctx.access_token().await?;
     let result = ctx
@@ -51,6 +53,7 @@ async fn mutate_add(ctx: &AppContext, args: LabelMutateArgs) -> AppResult<()> {
     ctx.output.emit(&text, &result)
 }
 
+/// Remove labels from a message and emit the mutation result.
 async fn mutate_rm(ctx: &AppContext, args: LabelMutateArgs) -> AppResult<()> {
     let access_token = ctx.access_token().await?;
     let result = ctx

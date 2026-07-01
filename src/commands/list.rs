@@ -3,6 +3,7 @@ use crate::context::AppContext;
 use crate::error::{AppError, AppResult};
 use crate::output::OutputMode;
 
+/// List messages matching the args and print each with a compact preview.
 pub async fn run(ctx: &AppContext, args: ListArgs) -> AppResult<()> {
     if args.limit == 0 {
         return Err(AppError::InvalidInput(
@@ -48,6 +49,7 @@ pub async fn run(ctx: &AppContext, args: ListArgs) -> AppResult<()> {
     ctx.output.emit(&text, &messages)
 }
 
+/// Decode HTML entities, collapse whitespace, and truncate a snippet to 120 chars for display.
 fn format_preview(snippet: Option<&str>) -> String {
     let snippet = snippet.unwrap_or("(no preview)");
     let decoded = html_escape::decode_html_entities(snippet).to_string();
@@ -64,6 +66,7 @@ fn format_preview(snippet: Option<&str>) -> String {
     format!("{}...", &compact[..end])
 }
 
+/// Combine the `--inbox` flag and a user query into a Gmail search string.
 fn build_query(inbox: bool, user_query: Option<&str>) -> Option<String> {
     let user_query = user_query.map(str::trim).filter(|query| !query.is_empty());
 

@@ -43,6 +43,27 @@ pub struct SendResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct AttachmentMeta {
+    pub attachment_id: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub size: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AttachmentList {
+    pub message_id: String,
+    pub attachments: Vec<AttachmentMeta>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SavedAttachment {
+    pub filename: String,
+    pub path: String,
+    pub bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct LabelView {
     pub id: String,
     pub name: String,

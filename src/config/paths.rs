@@ -14,6 +14,7 @@ pub struct AppPaths {
 }
 
 impl AppPaths {
+    /// Resolve the platform config/data directories, creating the profile and token subdirs.
     pub fn discover() -> AppResult<Self> {
         let config_root = dirs::config_dir()
             .ok_or_else(|| AppError::Config("unable to resolve config directory".to_string()))?;
@@ -36,18 +37,22 @@ impl AppPaths {
         })
     }
 
+    /// Path to a profile's settings JSON file.
     pub fn settings_file(&self, profile: &str) -> PathBuf {
         self.profiles_dir.join(format!("{profile}.json"))
     }
 
+    /// Path to a profile's token JSON file.
     pub fn token_file(&self, profile: &str) -> PathBuf {
         self.tokens_dir.join(format!("{profile}.json"))
     }
 
+    /// The app's config directory.
     pub fn config_dir(&self) -> &Path {
         &self.config_dir
     }
 
+    /// The app's data directory.
     pub fn data_dir(&self) -> &Path {
         &self.data_dir
     }

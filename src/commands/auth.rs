@@ -6,6 +6,7 @@ use crate::config::{self, Settings};
 use crate::context::AppContext;
 use crate::error::{AppError, AppResult};
 
+/// Dispatch a `gmail auth` subcommand (login/status/logout) and emit its result.
 pub async fn run(ctx: &AppContext, command: AuthCommand) -> AppResult<()> {
     match command {
         AuthCommand::Login => {
@@ -63,6 +64,7 @@ pub async fn run(ctx: &AppContext, command: AuthCommand) -> AppResult<()> {
     }
 }
 
+/// Ensure client_id/client_secret are set, prompting interactively and saving them when missing.
 fn ensure_login_settings(ctx: &AppContext) -> AppResult<Settings> {
     let mut settings = ctx.settings.clone();
     let missing_client_id = settings
@@ -118,6 +120,7 @@ fn ensure_login_settings(ctx: &AppContext) -> AppResult<Settings> {
     Ok(settings)
 }
 
+/// Build a human-readable description of which OAuth fields are missing.
 fn format_missing_fields(missing_client_id: bool, missing_client_secret: bool) -> String {
     match (missing_client_id, missing_client_secret) {
         (true, true) => "client_id and client_secret".to_string(),
@@ -127,6 +130,7 @@ fn format_missing_fields(missing_client_id: bool, missing_client_secret: bool) -
     }
 }
 
+/// Prompt repeatedly until the user enters a non-empty value.
 fn prompt_required(prompt: &str) -> AppResult<String> {
     loop {
         let value = prompt_line(prompt)?;
@@ -137,10 +141,12 @@ fn prompt_required(prompt: &str) -> AppResult<String> {
     }
 }
 
+/// Prompt for a value, allowing an empty response.
 fn prompt_optional(prompt: &str) -> AppResult<String> {
     prompt_line(prompt)
 }
 
+/// Write a prompt to stdout and read a single trimmed line from stdin.
 fn prompt_line(prompt: &str) -> AppResult<String> {
     let mut stdout = io::stdout();
     write!(stdout, "{prompt}")?;
@@ -151,11 +157,13 @@ fn prompt_line(prompt: &str) -> AppResult<String> {
     Ok(value.trim().to_string())
 }
 
+/// Whether an auth error message indicates a missing client secret.
 fn missing_client_secret_error(message: &str) -> bool {
     let lower = message.to_ascii_lowercase();
     lower.contains("client_secret is missing") || lower.contains("client secret is missing")
 }
 
+/// Interactively prompt for and persist a client secret after login failed for lack of one.
 fn prompt_for_missing_client_secret(
     ctx: &AppContext,
     settings: &Settings,

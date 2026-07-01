@@ -79,6 +79,7 @@ __BODY__
 </html>
 "#;
 
+/// Render markdown (tables, strikethrough, tasklists, footnotes) into the styled email HTML template.
 pub fn markdown_to_html(body_markdown: &str) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -97,6 +98,7 @@ pub fn markdown_to_html(body_markdown: &str) -> String {
     EMAIL_HTML_TEMPLATE.replacen("__BODY__", &body_html, 1)
 }
 
+/// Build a base64url-encoded RFC 822 message, using multipart/mixed when attachments are present.
 pub fn build_raw_message(request: &SendRequest) -> String {
     let mut headers = build_base_headers(request);
 
@@ -118,6 +120,7 @@ pub fn build_raw_message(request: &SendRequest) -> String {
     URL_SAFE_NO_PAD.encode(payload.as_bytes())
 }
 
+/// Assemble the common message headers (From, To, Cc, Bcc, Subject, threading) from the request.
 fn build_base_headers(request: &SendRequest) -> Vec<String> {
     let mut headers = Vec::new();
 
@@ -147,6 +150,7 @@ fn build_base_headers(request: &SendRequest) -> Vec<String> {
     headers
 }
 
+/// Build the multipart/mixed body: an HTML part followed by each base64-encoded attachment.
 fn multipart_body(request: &SendRequest, boundary: &str) -> String {
     let mut out = String::new();
     out.push_str(&format!("--{boundary}\r\n"));
@@ -176,6 +180,7 @@ fn multipart_body(request: &SendRequest, boundary: &str) -> String {
     out
 }
 
+/// Wrap a base64 string into 76-character CRLF-terminated lines per MIME conventions.
 fn fold_base64_lines(input: &str) -> String {
     let mut out = String::with_capacity(input.len() + input.len() / 76 + 8);
     let mut start = 0;
@@ -188,6 +193,7 @@ fn fold_base64_lines(input: &str) -> String {
     out
 }
 
+/// Generate a random MIME multipart boundary token.
 fn random_boundary() -> String {
     let mut bytes = [0_u8; 12];
     rand::thread_rng().fill(&mut bytes);
@@ -195,6 +201,7 @@ fn random_boundary() -> String {
     format!("gmail-cli-{token}")
 }
 
+/// Remove quote characters from a value destined for a quoted header parameter.
 fn escape_header_value(value: &str) -> String {
     value.replace('"', "")
 }

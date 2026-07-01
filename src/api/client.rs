@@ -1,3 +1,5 @@
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serde::Serialize;
@@ -8,7 +10,9 @@ use crate::error::{AppError, AppResult};
 
 use super::labels;
 use super::messages;
-use super::models::{LabelMutationResult, LabelView, MessageView, SendResult};
+use super::models::{
+    AttachmentList, AttachmentMeta, LabelMutationResult, LabelView, MessageView, SendResult,
+};
 
 const GMAIL_API_BASE_URL: &str = "https://gmail.googleapis.com";
 
@@ -19,6 +23,7 @@ pub struct GmailClient {
 }
 
 impl GmailClient {
+    /// Construct a client targeting the public Gmail API base URL.
     pub fn new() -> Self {
         Self {
             http: Client::new(),
@@ -26,6 +31,7 @@ impl GmailClient {
         }
     }
 
+    /// Fetch a single message with `format=metadata` and project it into a `MessageView`.
     pub async fn get_msg(&self, id: &str, access_token: &str) -> AppResult<MessageView> {
         let endpoint = messages::message_endpoint(id);
         let query = messages::get_query();
@@ -34,6 +40,49 @@ impl GmailClient {
         Ok(resource.into_view())
     }
 
+    /// Fetch a message with `format=full` and walk its MIME tree, returning
+    /// metadata for every part that carries a downloadable `attachmentId`.
+    pub async fn list_attachments(
+        &self,
+        id: &str,
+        access_token: &str,
+    ) -> AppResult<AttachmentList> {
+        let endpoint = messages::message_endpoint(id);
+        let query = messages::full_query();
+        let resource: GmailMessageResource =
+            self.get_json(&endpoint, access_token, Some(&query)).await?;
+
+        let mut attachments = Vec::new();
+        if let Some(payload) = &resource.payload {
+            collect_attachments(payload, &mut attachments);
+        }
+
+        Ok(AttachmentList {
+            message_id: resource.id,
+            attachments,
+        })
+    }
+
+    /// Download a single attachment's bytes via `messages.attachments.get`,
+    /// decoding the base64url payload the Gmail API returns.
+    pub async fn get_attachment(
+        &self,
+        message_id: &str,
+        attachment_id: &str,
+        access_token: &str,
+    ) -> AppResult<Vec<u8>> {
+        let endpoint = messages::attachment_endpoint(message_id, attachment_id);
+        let resource: GmailAttachmentResource =
+            self.get_json(&endpoint, access_token, None).await?;
+
+        let data = resource.data.ok_or_else(|| {
+            AppError::Api("gmail attachment response contained no data".to_string())
+        })?;
+
+        decode_base64url(&data)
+    }
+
+    /// List messages matching `query` (up to `limit`), fetching each one's metadata.
     pub async fn list(
         &self,
         access_token: &str,
@@ -55,6 +104,7 @@ impl GmailClient {
         Ok(results)
     }
 
+    /// Submit a base64url-encoded raw RFC 822 message, optionally into an existing thread.
     pub async fn send(
         &self,
         raw_message: &str,
@@ -75,6 +125,7 @@ impl GmailClient {
         })
     }
 
+    /// Fetch all labels on the account, sorted alphabetically by name.
     pub async fn list_labels(&self, _access_token: &str) -> AppResult<Vec<LabelView>> {
         let endpoint = labels::list_labels_endpoint();
         let response: GmailLabelListResponse = self.get_json(endpoint, _access_token, None).await?;
@@ -92,6 +143,7 @@ impl GmailClient {
         Ok(labels_out)
     }
 
+    /// Add the given labels to a message.
     pub async fn add_labels(
         &self,
         id: &str,
@@ -101,6 +153,7 @@ impl GmailClient {
         self.modify_labels(id, labels, &[], access_token).await
     }
 
+    /// Remove the given labels from a message.
     pub async fn rm_labels(
         &self,
         id: &str,
@@ -110,6 +163,7 @@ impl GmailClient {
         self.modify_labels(id, &[], labels, access_token).await
     }
 
+    /// Resolve label names/ids, then issue a single `messages.modify` adding and removing them.
     async fn modify_labels(
         &self,
         id: &str,
@@ -135,6 +189,7 @@ impl GmailClient {
         })
     }
 
+    /// Map requested label names or ids to canonical label ids, erroring on any unknown label.
     async fn resolve_label_ids(
         &self,
         requested: &[String],
@@ -175,6 +230,7 @@ impl GmailClient {
         Ok(out)
     }
 
+    /// Issue a bearer-authenticated GET with optional query params and deserialize the JSON body.
     async fn get_json<T: DeserializeOwned>(
         &self,
         endpoint: &str,
@@ -191,6 +247,7 @@ impl GmailClient {
         self.parse_json_response(response).await
     }
 
+    /// Issue a bearer-authenticated POST with a JSON body and deserialize the JSON response.
     async fn post_json<T: DeserializeOwned, B: Serialize>(
         &self,
         endpoint: &str,
@@ -209,12 +266,14 @@ impl GmailClient {
         self.parse_json_response(response).await
     }
 
+    /// Join an endpoint path onto the client's base URL.
     fn endpoint_url(&self, endpoint: &str) -> AppResult<Url> {
         let mut url = Url::parse(&self.base_url)?;
         url.set_path(endpoint.trim_start_matches('/'));
         Ok(url)
     }
 
+    /// Deserialize a successful response, or convert an error status + body into an `AppError`.
     async fn parse_json_response<T: DeserializeOwned>(
         &self,
         response: reqwest::Response,
@@ -245,6 +304,7 @@ struct GmailMessageResource {
 }
 
 impl GmailMessageResource {
+    /// Flatten the raw resource into a `MessageView`, extracting common headers.
     fn into_view(self) -> MessageView {
         let headers = self
             .payload
@@ -269,6 +329,58 @@ impl GmailMessageResource {
 #[derive(Debug, Deserialize)]
 struct GmailMessagePayload {
     headers: Option<Vec<GmailMessageHeader>>,
+    #[serde(rename = "mimeType")]
+    mime_type: Option<String>,
+    filename: Option<String>,
+    body: Option<GmailPartBody>,
+    parts: Option<Vec<GmailMessagePayload>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GmailPartBody {
+    #[serde(rename = "attachmentId")]
+    attachment_id: Option<String>,
+    size: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GmailAttachmentResource {
+    data: Option<String>,
+}
+
+/// Recursively descend a MIME part tree, pushing metadata for each part that
+/// has both an `attachmentId` and a non-empty filename (skipping inline bodies).
+fn collect_attachments(part: &GmailMessagePayload, out: &mut Vec<AttachmentMeta>) {
+    if let Some(body) = &part.body {
+        if let Some(attachment_id) = &body.attachment_id {
+            let filename = part.filename.clone().unwrap_or_default();
+            if !filename.is_empty() {
+                out.push(AttachmentMeta {
+                    attachment_id: attachment_id.clone(),
+                    filename,
+                    mime_type: part
+                        .mime_type
+                        .clone()
+                        .unwrap_or_else(|| "application/octet-stream".to_string()),
+                    size: body.size,
+                });
+            }
+        }
+    }
+
+    if let Some(parts) = &part.parts {
+        for nested in parts {
+            collect_attachments(nested, out);
+        }
+    }
+}
+
+/// Decode a base64url string, tolerating both padded and unpadded input.
+fn decode_base64url(data: &str) -> AppResult<Vec<u8>> {
+    let trimmed = data.trim_end_matches('=');
+    URL_SAFE_NO_PAD
+        .decode(trimmed)
+        .map_err(|err| AppError::Api(format!("failed to decode attachment data: {err}")))
 }
 
 #[derive(Debug, Deserialize)]
@@ -343,6 +455,7 @@ struct GmailApiErrorDetail {
     reason: Option<String>,
 }
 
+/// Find a header by case-insensitive name, returning its trimmed value if non-empty.
 fn header_value(headers: &[GmailMessageHeader], target: &str) -> Option<String> {
     headers
         .iter()
@@ -351,6 +464,7 @@ fn header_value(headers: &[GmailMessageHeader], target: &str) -> Option<String> 
         .filter(|value| !value.is_empty())
 }
 
+/// Map an HTTP error status and body into an `AppError`, routing 401/403 to an auth error.
 fn map_api_error(status: StatusCode, body: &str) -> AppError {
     let message = parse_api_error_message(body).unwrap_or_else(|| {
         let body = body.trim();
@@ -370,6 +484,7 @@ fn map_api_error(status: StatusCode, body: &str) -> AppError {
     AppError::Api(format!("gmail api request failed ({status}): {message}"))
 }
 
+/// Parse Gmail's JSON error envelope into a compact `message, status, code, reason` string.
 fn parse_api_error_message(body: &str) -> Option<String> {
     let envelope = serde_json::from_str::<GmailApiErrorEnvelope>(body).ok()?;
     let mut parts = Vec::new();

@@ -3,6 +3,7 @@ use crate::commands;
 use crate::context::AppContext;
 use crate::error::AppResult;
 
+/// Bootstrap the app context and dispatch the parsed CLI command to its handler.
 pub async fn run(cli: Cli) -> AppResult<()> {
     let Cli {
         profile,
@@ -19,5 +20,6 @@ pub async fn run(cli: Cli) -> AppResult<()> {
         Command::Send(args) => commands::send::run(&ctx, args).await,
         Command::Get(args) => commands::get::run(&ctx, args).await,
         Command::Label(args) => commands::label::run(&ctx, args.command).await,
+        Command::Attachments(args) => commands::attachments::run(&ctx, args.command).await,
     }
 }

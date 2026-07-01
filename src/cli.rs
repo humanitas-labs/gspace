@@ -27,6 +27,7 @@ pub enum Command {
     Send(SendArgs),
     Get(GetArgs),
     Label(LabelArgs),
+    Attachments(AttachmentsArgs),
 }
 
 #[derive(Debug, Args)]
@@ -80,6 +81,45 @@ pub struct SendArgs {
 pub struct GetArgs {
     #[arg(help = "Gmail message id")]
     pub id: String,
+}
+
+#[derive(Debug, Args)]
+pub struct AttachmentsArgs {
+    #[command(subcommand)]
+    pub command: AttachmentsCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AttachmentsCommand {
+    #[command(visible_alias = "list")]
+    Ls(AttachmentsLsArgs),
+    Get(AttachmentsGetArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct AttachmentsLsArgs {
+    #[arg(help = "Gmail message id")]
+    pub id: String,
+}
+
+#[derive(Debug, Args)]
+pub struct AttachmentsGetArgs {
+    #[arg(help = "Gmail message id")]
+    pub id: String,
+    #[arg(
+        long,
+        default_value = ".",
+        help = "Directory to write attachments into (created if missing)"
+    )]
+    pub out: PathBuf,
+    #[arg(
+        long,
+        conflicts_with = "name",
+        help = "Only download the attachment at this 1-based index"
+    )]
+    pub index: Option<usize>,
+    #[arg(long, help = "Only download attachments matching this filename")]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Args)]

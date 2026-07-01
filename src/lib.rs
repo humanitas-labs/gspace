@@ -12,6 +12,7 @@ pub mod output;
 use cli::Cli;
 use error::AppResult;
 
+/// Entry point that runs the parsed CLI.
 pub async fn run(cli: Cli) -> AppResult<()> {
     app::run(cli).await
 }

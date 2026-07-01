@@ -44,6 +44,10 @@ mod client_under_test {
                         value: "<abc@example.com>".to_string(),
                     },
                 ]),
+                mime_type: Some("multipart/mixed".to_string()),
+                filename: None,
+                body: None,
+                parts: None,
             }),
         };
 
@@ -53,6 +57,62 @@ mod client_under_test {
         assert_eq!(view.subject.as_deref(), Some("hello"));
         assert_eq!(view.from.as_deref(), Some("dev@example.com"));
         assert_eq!(view.message_id.as_deref(), Some("<abc@example.com>"));
+    }
+
+    #[test]
+    fn collects_attachments_from_nested_parts() {
+        let payload = GmailMessagePayload {
+            headers: None,
+            mime_type: Some("multipart/mixed".to_string()),
+            filename: None,
+            body: None,
+            parts: vec![
+                GmailMessagePayload {
+                    headers: None,
+                    mime_type: Some("text/plain".to_string()),
+                    filename: Some(String::new()),
+                    body: Some(GmailPartBody {
+                        attachment_id: None,
+                        size: Some(12),
+                    }),
+                    parts: None,
+                },
+                GmailMessagePayload {
+                    headers: None,
+                    mime_type: Some("multipart/related".to_string()),
+                    filename: None,
+                    body: None,
+                    parts: vec![GmailMessagePayload {
+                        headers: None,
+                        mime_type: Some("application/pdf".to_string()),
+                        filename: Some("resume.pdf".to_string()),
+                        body: Some(GmailPartBody {
+                            attachment_id: Some("att-1".to_string()),
+                            size: Some(2048),
+                        }),
+                        parts: None,
+                    }]
+                    .into(),
+                },
+            ]
+            .into(),
+        };
+
+        let mut out = Vec::new();
+        collect_attachments(&payload, &mut out);
+
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].filename, "resume.pdf");
+        assert_eq!(out[0].attachment_id, "att-1");
+        assert_eq!(out[0].mime_type, "application/pdf");
+        assert_eq!(out[0].size, Some(2048));
+    }
+
+    #[test]
+    fn decodes_url_safe_base64_with_and_without_padding() {
+        // "hello" -> aGVsbG8= (standard) / aGVsbG8 (url-safe no pad)
+        assert_eq!(decode_base64url("aGVsbG8").unwrap(), b"hello");
+        assert_eq!(decode_base64url("aGVsbG8=").unwrap(), b"hello");
     }
 
     #[test]

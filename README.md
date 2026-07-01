@@ -9,6 +9,7 @@ Rust scaffold for a Gmail CLI with this command shape:
 - `gmail send ...`
 - `gmail get <id>`
 - `gmail label ...`
+- `gmail attachments ls|get <id> ...`
 
 OAuth login is wired with browser auth code flow + PKCE and local callback capture.
 `gmail list`, `gmail get`, `gmail send`, and `gmail label` are wired to the real Gmail API.
@@ -32,6 +33,9 @@ gmail
     ls
     add <id> <label...>
     rm <id> <label...>
+  attachments
+    ls <id>
+    get <id> [--out <dir>] [--index <n> | --name <file>]
 ```
 
 See `docs/architecture.md` for data flow and implementation phases.
