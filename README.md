@@ -14,7 +14,7 @@ Rust scaffold for a Gmail CLI with this command shape:
 OAuth login is wired with browser auth code flow + PKCE and local callback capture.
 `gmail list`, `gmail get`, `gmail send`, and `gmail label` are wired to the real Gmail API.
 `gmail get` prints the full decoded message body (text/plain, falling back to
-stripped text/html), not just a snippet.
+stripped text/html), not just a snippet, and lists any attachments.
 `gmail send` treats body input as Markdown and sends rendered `text/html` by default.
 `gmail send` also sets `From` with a display name when available (`sender_name` profile setting or Google profile name captured at login).
 

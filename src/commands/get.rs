@@ -18,6 +18,28 @@ pub async fn run(ctx: &AppContext, args: GetArgs) -> AppResult<()> {
         if let Some(date) = &message.date {
             println!("date: {date}");
         }
+
+        if !message.attachments.is_empty() {
+            println!("attachments ({}):", message.attachments.len());
+            for (index, attachment) in message.attachments.iter().enumerate() {
+                match attachment.size {
+                    Some(size) => println!(
+                        "  {}. {} | {} | {} bytes",
+                        index + 1,
+                        attachment.filename,
+                        attachment.mime_type,
+                        size
+                    ),
+                    None => println!(
+                        "  {}. {} | {}",
+                        index + 1,
+                        attachment.filename,
+                        attachment.mime_type
+                    ),
+                }
+            }
+            println!("  (download with: gmail attachments get {})", message.id);
+        }
         println!();
 
         match message.body.as_deref() {

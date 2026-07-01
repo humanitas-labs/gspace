@@ -13,6 +13,7 @@ pub struct MessageView {
     pub references: Option<String>,
     pub reply_to: Option<String>,
     pub body: Option<String>,
+    pub attachments: Vec<AttachmentMeta>,
 }
 
 #[derive(Debug, Clone)]

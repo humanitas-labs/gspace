@@ -57,6 +57,7 @@ mod client_under_test {
         assert_eq!(view.subject.as_deref(), Some("hello"));
         assert_eq!(view.from.as_deref(), Some("dev@example.com"));
         assert_eq!(view.message_id.as_deref(), Some("<abc@example.com>"));
+        assert!(view.attachments.is_empty());
     }
 
     #[test]

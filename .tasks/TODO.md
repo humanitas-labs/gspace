@@ -104,3 +104,14 @@
 - [x] `cargo fmt && cargo check && cargo test` (added text/plain-preference and
       html-fallback body extraction unit tests)
 - [x] `cargo run -- get <id>` (live: read a long job-description email body in full)
+
+- [x] Make `gmail get <id>` list attachments so their presence is visible.
+      Motivation: `get` now fetches `format=full` but only showed body — a reader
+      (incl. an agent) had no signal that a message carried attachments unless the
+      body happened to mention them. `MessageView` gains an `attachments` array
+      (populated via the existing `collect_attachments` walk, surfaced in JSON);
+      text output prints a numbered attachment list with a `gmail attachments get`
+      download hint.
+- [x] `cargo fmt && cargo check && cargo test` (asserted metadata-format view has
+      no attachments)
+- [x] `cargo run -- get <id>` (live: 3 PDF attachments listed in text + JSON)

@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.4.0] - 2026-06-30
+
+### Changed
+
+- `gmail get <id>` now lists a message's attachments (filename, MIME type, size)
+  with a download hint, so attachment presence is visible without a separate
+  `attachments ls` call. `MessageView` gains an `attachments` array, surfaced in
+  JSON output too.
+
 ## [0.3.0] - 2026-06-30
 
 ### Changed

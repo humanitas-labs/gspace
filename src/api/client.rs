@@ -329,6 +329,10 @@ impl GmailMessageResource {
             .and_then(|payload| payload.headers.as_deref())
             .unwrap_or_default();
         let body = payload.as_ref().and_then(extract_body);
+        let mut attachments = Vec::new();
+        if let Some(payload) = payload.as_ref() {
+            collect_attachments(payload, &mut attachments);
+        }
 
         MessageView {
             id,
@@ -342,6 +346,7 @@ impl GmailMessageResource {
             in_reply_to: header_value(headers, "In-Reply-To"),
             references: header_value(headers, "References"),
             body,
+            attachments,
         }
     }
 }
