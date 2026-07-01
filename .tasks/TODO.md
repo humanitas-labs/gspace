@@ -91,3 +91,16 @@
 - [x] `cargo run -- attachments ls <id>` (live: messages with PDF attachments)
 - [x] `cargo run -- attachments get <id> --out ~/Downloads/gmail-attachments`
       (live: 4 resumes downloaded, verified as valid PDFs, byte-exact sizes)
+
+- [x] Make `gmail get <id>` show the full message body, not just the snippet.
+      Motivation: `get` fetched `format=metadata` (headers + snippet only), so the
+      actual email text was never exposed — same gap as attachments. Adds
+      `get_msg_full` (fetches `format=full`) + a MIME-tree body extractor
+      (`extract_body`) that prefers `text/plain` and falls back to tag-stripped
+      `text/html`. `MessageView` gains a `body` field (surfaced in JSON too); text
+      output prints headers then body, falling back to the snippet when no body
+      part decodes.
+
+- [x] `cargo fmt && cargo check && cargo test` (added text/plain-preference and
+      html-fallback body extraction unit tests)
+- [x] `cargo run -- get <id>` (live: read a long job-description email body in full)

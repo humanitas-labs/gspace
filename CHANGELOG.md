@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.3.0] - 2026-06-30
+
+### Changed
+
+- `gmail get <id>` now fetches `format=full` and prints the decoded message body
+  (preferring `text/plain`, falling back to tag-stripped `text/html`), instead of
+  only headers and a snippet. JSON output gains a `body` field. Falls back to the
+  snippet when no decodable body part is present.
+
 ## [0.2.0] - 2026-06-30
 
 ### Added

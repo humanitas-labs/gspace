@@ -12,6 +12,7 @@ pub struct MessageView {
     pub in_reply_to: Option<String>,
     pub references: Option<String>,
     pub reply_to: Option<String>,
+    pub body: Option<String>,
 }
 
 #[derive(Debug, Clone)]

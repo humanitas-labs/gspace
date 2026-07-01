@@ -74,6 +74,7 @@ mod client_under_test {
                     body: Some(GmailPartBody {
                         attachment_id: None,
                         size: Some(12),
+                        data: None,
                     }),
                     parts: None,
                 },
@@ -89,6 +90,7 @@ mod client_under_test {
                         body: Some(GmailPartBody {
                             attachment_id: Some("att-1".to_string()),
                             size: Some(2048),
+                            data: None,
                         }),
                         parts: None,
                     }]
@@ -113,6 +115,63 @@ mod client_under_test {
         // "hello" -> aGVsbG8= (standard) / aGVsbG8 (url-safe no pad)
         assert_eq!(decode_base64url("aGVsbG8").unwrap(), b"hello");
         assert_eq!(decode_base64url("aGVsbG8=").unwrap(), b"hello");
+    }
+
+    #[test]
+    fn extract_body_prefers_plain_text_over_html() {
+        // "hello" base64url; html part would decode to "hi" but plain wins.
+        let payload = GmailMessagePayload {
+            headers: None,
+            mime_type: Some("multipart/alternative".to_string()),
+            filename: None,
+            body: None,
+            parts: vec![
+                GmailMessagePayload {
+                    headers: None,
+                    mime_type: Some("text/html".to_string()),
+                    filename: None,
+                    body: Some(GmailPartBody {
+                        attachment_id: None,
+                        size: None,
+                        // "<p>hi</p>" base64url
+                        data: Some("PHA-aGk8L3A-".to_string()),
+                    }),
+                    parts: None,
+                },
+                GmailMessagePayload {
+                    headers: None,
+                    mime_type: Some("text/plain".to_string()),
+                    filename: None,
+                    body: Some(GmailPartBody {
+                        attachment_id: None,
+                        size: None,
+                        data: Some("aGVsbG8".to_string()),
+                    }),
+                    parts: None,
+                },
+            ]
+            .into(),
+        };
+
+        assert_eq!(extract_body(&payload).as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn extract_body_falls_back_to_stripped_html() {
+        let payload = GmailMessagePayload {
+            headers: None,
+            mime_type: Some("text/html".to_string()),
+            filename: None,
+            body: Some(GmailPartBody {
+                attachment_id: None,
+                size: None,
+                // "<p>hi &amp; bye</p>" base64url
+                data: Some("PHA-aGkgJmFtcDsgYnllPC9wPg".to_string()),
+            }),
+            parts: None,
+        };
+
+        assert_eq!(extract_body(&payload).as_deref(), Some("hi & bye"));
     }
 
     #[test]

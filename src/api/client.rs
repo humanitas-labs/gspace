@@ -40,6 +40,16 @@ impl GmailClient {
         Ok(resource.into_view())
     }
 
+    /// Fetch a single message with `format=full`, projecting it into a
+    /// `MessageView` that includes the decoded text body.
+    pub async fn get_msg_full(&self, id: &str, access_token: &str) -> AppResult<MessageView> {
+        let endpoint = messages::message_endpoint(id);
+        let query = messages::full_query();
+        let resource: GmailMessageResource =
+            self.get_json(&endpoint, access_token, Some(&query)).await?;
+        Ok(resource.into_view())
+    }
+
     /// Fetch a message with `format=full` and walk its MIME tree, returning
     /// metadata for every part that carries a downloadable `attachmentId`.
     pub async fn list_attachments(
@@ -304,24 +314,34 @@ struct GmailMessageResource {
 }
 
 impl GmailMessageResource {
-    /// Flatten the raw resource into a `MessageView`, extracting common headers.
+    /// Flatten the raw resource into a `MessageView`, extracting common headers
+    /// and (when the payload carries part data, i.e. `format=full`) the body text.
     fn into_view(self) -> MessageView {
-        let headers = self
-            .payload
-            .and_then(|payload| payload.headers)
+        let GmailMessageResource {
+            id,
+            thread_id,
+            snippet,
+            payload,
+        } = self;
+
+        let headers = payload
+            .as_ref()
+            .and_then(|payload| payload.headers.as_deref())
             .unwrap_or_default();
+        let body = payload.as_ref().and_then(extract_body);
 
         MessageView {
-            id: self.id,
-            thread_id: self.thread_id,
-            snippet: self.snippet,
-            subject: header_value(&headers, "Subject"),
-            from: header_value(&headers, "From"),
-            reply_to: header_value(&headers, "Reply-To"),
-            date: header_value(&headers, "Date"),
-            message_id: header_value(&headers, "Message-ID"),
-            in_reply_to: header_value(&headers, "In-Reply-To"),
-            references: header_value(&headers, "References"),
+            id,
+            thread_id,
+            snippet,
+            subject: header_value(headers, "Subject"),
+            from: header_value(headers, "From"),
+            reply_to: header_value(headers, "Reply-To"),
+            date: header_value(headers, "Date"),
+            message_id: header_value(headers, "Message-ID"),
+            in_reply_to: header_value(headers, "In-Reply-To"),
+            references: header_value(headers, "References"),
+            body,
         }
     }
 }
@@ -341,11 +361,65 @@ struct GmailPartBody {
     #[serde(rename = "attachmentId")]
     attachment_id: Option<String>,
     size: Option<u64>,
+    data: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct GmailAttachmentResource {
     data: Option<String>,
+}
+
+/// Extract a human-readable body from a MIME part tree, preferring `text/plain`
+/// and falling back to a tag-stripped `text/html` part.
+fn extract_body(payload: &GmailMessagePayload) -> Option<String> {
+    part_text(payload, "text/plain")
+        .or_else(|| part_text(payload, "text/html").map(|html| strip_html(&html)))
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
+/// Depth-first search for the first part whose MIME type matches `want_mime`,
+/// returning its inline base64url `data` decoded to a UTF-8 string.
+fn part_text(part: &GmailMessagePayload, want_mime: &str) -> Option<String> {
+    if part.mime_type.as_deref() == Some(want_mime) {
+        if let Some(data) = part.body.as_ref().and_then(|body| body.data.as_ref()) {
+            if let Ok(bytes) = decode_base64url(data) {
+                return Some(String::from_utf8_lossy(&bytes).into_owned());
+            }
+        }
+    }
+
+    if let Some(parts) = &part.parts {
+        for nested in parts {
+            if let Some(found) = part_text(nested, want_mime) {
+                return Some(found);
+            }
+        }
+    }
+
+    None
+}
+
+/// Crudely reduce an HTML fragment to plain text: drop tags, decode entities,
+/// and collapse trailing whitespace. Good enough for reading an email in a terminal.
+fn strip_html(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+
+    let decoded = html_escape::decode_html_entities(&out);
+    decoded
+        .lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Recursively descend a MIME part tree, pushing metadata for each part that
