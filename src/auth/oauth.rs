@@ -308,14 +308,14 @@ async fn exchange_refresh_token(config: &OAuthConfig, refresh_token: &str) -> Ap
     if token.refresh_token.is_none() {
         token.refresh_token = Some(refresh_token.to_string());
     }
-    if token.email.is_none() || token.name.is_none() {
-        if let Ok(profile) = fetch_user_profile(&token.access_token).await {
-            if token.email.is_none() {
-                token.email = profile.email;
-            }
-            if token.name.is_none() {
-                token.name = profile.name;
-            }
+    if (token.email.is_none() || token.name.is_none())
+        && let Ok(profile) = fetch_user_profile(&token.access_token).await
+    {
+        if token.email.is_none() {
+            token.email = profile.email;
+        }
+        if token.name.is_none() {
+            token.name = profile.name;
         }
     }
 

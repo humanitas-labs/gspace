@@ -138,10 +138,7 @@ fn build_base_headers(request: &SendRequest) -> Vec<String> {
         headers.push(format!("Bcc: {}", request.bcc.join(", ")));
     }
 
-    headers.push(format!(
-        "Subject: {}",
-        encode_header_text(&request.subject)
-    ));
+    headers.push(format!("Subject: {}", encode_header_text(&request.subject)));
     headers.push("MIME-Version: 1.0".to_string());
     if let Some(in_reply_to) = &request.in_reply_to {
         headers.push(format!("In-Reply-To: {in_reply_to}"));

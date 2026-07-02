@@ -10,6 +10,7 @@ Rust scaffold for a Gmail CLI with this command shape:
 - `gmail get <id>`
 - `gmail label ...`
 - `gmail attachments ls|get <id> ...`
+- `gmail aliases ls`
 
 OAuth login is wired with browser auth code flow + PKCE and local callback capture.
 `gmail list`, `gmail get`, `gmail send`, and `gmail label` are wired to the real Gmail API.
@@ -17,6 +18,9 @@ OAuth login is wired with browser auth code flow + PKCE and local callback captu
 stripped text/html), not just a snippet, and lists any attachments.
 `gmail send` treats body input as Markdown and sends rendered `text/html` by default.
 `gmail send` also sets `From` with a display name when available (`sender_name` profile setting or Google profile name captured at login).
+`gmail send --from <address>` sends from a verified send-as alias (validated against
+`gmail aliases ls`; unknown or unverified addresses error instead of Gmail silently
+sending from the primary). The `send_from` profile setting makes an alias the default.
 
 ## Current command tree
 
@@ -28,7 +32,7 @@ gmail
     logout
   list [--inbox] [--limit <n>] [--q <query>]
   send [--reply <id>] [--attach <path> ...]
-       [--to ...] [--subject ...]
+       [--to ...] [--subject ...] [--from <alias>]
        (--body ... | --body-file ... | --draft-file ... | --stdin)
   get <id>
   label
@@ -38,6 +42,8 @@ gmail
   attachments
     ls <id>
     get <id> [--out <dir>] [--index <n> | --name <file>]
+  aliases
+    ls
 ```
 
 See `docs/architecture.md` for data flow and implementation phases.
@@ -59,9 +65,14 @@ See `docs/architecture.md` for data flow and implementation phases.
   "client_id": "YOUR_CLIENT_ID",
   "client_secret": "YOUR_CLIENT_SECRET",
   "redirect_uri": "http://127.0.0.1:8787/callback",
-  "sender_name": "Jane Doe"
+  "sender_name": "Jane Doe",
+  "send_from": "you@yourdomain.com"
 }
 ```
+
+`send_from` is optional: when set, sends default to that send-as alias
+(overridable per send with `--from`); when absent, sends come from the
+logged-in account's primary address.
 
 If either `client_id` or `client_secret` is missing, `gmail auth login` prompts for both and writes the profile file for you.
 If Google still rejects login with `client_secret is missing`, `gmail auth login` prompts for `client_secret`, saves it, and retries.
@@ -102,7 +113,9 @@ cargo run -- get <message-id>
 cargo run -- send --to dev@example.com --subject "hello" --body "**hi** from _markdown_"
 cargo run -- send --to dev@example.com --subject "with attachment" --body "see attached" --attach ./file.pdf
 cargo run -- send --reply <message-id> --draft-file ./reply.txt --to dev@example.com
+cargo run -- send --to dev@example.com --subject "hello" --body "hi" --from you@yourdomain.com
 cargo run -- label ls
+cargo run -- aliases ls
 ```
 
 ## Next implementation steps

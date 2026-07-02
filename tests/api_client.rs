@@ -14,6 +14,10 @@ mod models {
     pub use gmail::api::models::*;
 }
 
+mod send_as {
+    pub use gmail::api::send_as::*;
+}
+
 mod client_under_test {
     #![allow(dead_code)]
 
@@ -186,6 +190,59 @@ mod client_under_test {
             header_value(&headers, "Subject").as_deref(),
             Some("case test")
         );
+    }
+
+    #[test]
+    fn maps_send_as_resource_to_view() {
+        let response: GmailSendAsListResponse = serde_json::from_str(
+            r#"{
+                "sendAs": [
+                    {
+                        "sendAsEmail": "hello@example.com",
+                        "displayName": "Jane Doe",
+                        "verificationStatus": "accepted",
+                        "treatAsAlias": true
+                    },
+                    {
+                        "sendAsEmail": "jane@example.com",
+                        "displayName": "",
+                        "isPrimary": true,
+                        "isDefault": true
+                    },
+                    {
+                        "sendAsEmail": "pending@example.com",
+                        "verificationStatus": "pending"
+                    }
+                ]
+            }"#,
+        )
+        .expect("send-as payload should deserialize");
+
+        let views = response
+            .send_as
+            .expect("sendAs list should be present")
+            .into_iter()
+            .map(GmailSendAsResource::into_view)
+            .collect::<Vec<_>>();
+
+        assert_eq!(views.len(), 3);
+
+        let verified = &views[0];
+        assert_eq!(verified.email, "hello@example.com");
+        assert_eq!(verified.display_name.as_deref(), Some("Jane Doe"));
+        assert!(!verified.is_primary);
+        assert!(verified.is_sendable());
+
+        let primary = &views[1];
+        assert_eq!(primary.email, "jane@example.com");
+        assert_eq!(primary.display_name, None);
+        assert!(primary.is_primary);
+        assert!(primary.is_default);
+        assert!(primary.is_sendable());
+
+        let pending = &views[2];
+        assert_eq!(pending.verification_status.as_deref(), Some("pending"));
+        assert!(!pending.is_sendable());
     }
 
     #[test]

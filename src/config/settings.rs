@@ -17,6 +17,8 @@ pub struct Settings {
     pub redirect_uri: Option<String>,
     #[serde(default)]
     pub sender_name: Option<String>,
+    #[serde(default)]
+    pub send_from: Option<String>,
 }
 
 impl Settings {

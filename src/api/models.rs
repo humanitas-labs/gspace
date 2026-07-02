@@ -66,6 +66,24 @@ pub struct SavedAttachment {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SendAsView {
+    pub email: String,
+    pub display_name: Option<String>,
+    pub is_primary: bool,
+    pub is_default: bool,
+    pub verification_status: Option<String>,
+}
+
+impl SendAsView {
+    /// Whether Gmail will honor this address in a From header (primary, or a
+    /// verified alias). Sending from anything else is silently rewritten to
+    /// the primary address by the Gmail API.
+    pub fn is_sendable(&self) -> bool {
+        self.is_primary || self.verification_status.as_deref() == Some("accepted")
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct LabelView {
     pub id: String,
     pub name: String,

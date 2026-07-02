@@ -11,8 +11,10 @@ use crate::error::{AppError, AppResult};
 use super::labels;
 use super::messages;
 use super::models::{
-    AttachmentList, AttachmentMeta, LabelMutationResult, LabelView, MessageView, SendResult,
+    AttachmentList, AttachmentMeta, LabelMutationResult, LabelView, MessageView, SendAsView,
+    SendResult,
 };
+use super::send_as;
 
 const GMAIL_API_BASE_URL: &str = "https://gmail.googleapis.com";
 
@@ -133,6 +135,20 @@ impl GmailClient {
             thread_id: response.thread_id,
             note: "message accepted by gmail api".to_string(),
         })
+    }
+
+    /// Fetch the account's send-as aliases, primary first then alphabetical by email.
+    pub async fn list_send_as(&self, access_token: &str) -> AppResult<Vec<SendAsView>> {
+        let endpoint = send_as::list_send_as_endpoint();
+        let response: GmailSendAsListResponse = self.get_json(endpoint, access_token, None).await?;
+        let mut aliases = response
+            .send_as
+            .unwrap_or_default()
+            .into_iter()
+            .map(GmailSendAsResource::into_view)
+            .collect::<Vec<_>>();
+        aliases.sort_by(|a, b| b.is_primary.cmp(&a.is_primary).then(a.email.cmp(&b.email)));
+        Ok(aliases)
     }
 
     /// Fetch all labels on the account, sorted alphabetically by name.
@@ -386,12 +402,11 @@ fn extract_body(payload: &GmailMessagePayload) -> Option<String> {
 /// Depth-first search for the first part whose MIME type matches `want_mime`,
 /// returning its inline base64url `data` decoded to a UTF-8 string.
 fn part_text(part: &GmailMessagePayload, want_mime: &str) -> Option<String> {
-    if part.mime_type.as_deref() == Some(want_mime) {
-        if let Some(data) = part.body.as_ref().and_then(|body| body.data.as_ref()) {
-            if let Ok(bytes) = decode_base64url(data) {
-                return Some(String::from_utf8_lossy(&bytes).into_owned());
-            }
-        }
+    if part.mime_type.as_deref() == Some(want_mime)
+        && let Some(data) = part.body.as_ref().and_then(|body| body.data.as_ref())
+        && let Ok(bytes) = decode_base64url(data)
+    {
+        return Some(String::from_utf8_lossy(&bytes).into_owned());
     }
 
     if let Some(parts) = &part.parts {
@@ -430,20 +445,20 @@ fn strip_html(html: &str) -> String {
 /// Recursively descend a MIME part tree, pushing metadata for each part that
 /// has both an `attachmentId` and a non-empty filename (skipping inline bodies).
 fn collect_attachments(part: &GmailMessagePayload, out: &mut Vec<AttachmentMeta>) {
-    if let Some(body) = &part.body {
-        if let Some(attachment_id) = &body.attachment_id {
-            let filename = part.filename.clone().unwrap_or_default();
-            if !filename.is_empty() {
-                out.push(AttachmentMeta {
-                    attachment_id: attachment_id.clone(),
-                    filename,
-                    mime_type: part
-                        .mime_type
-                        .clone()
-                        .unwrap_or_else(|| "application/octet-stream".to_string()),
-                    size: body.size,
-                });
-            }
+    if let Some(body) = &part.body
+        && let Some(attachment_id) = &body.attachment_id
+    {
+        let filename = part.filename.clone().unwrap_or_default();
+        if !filename.is_empty() {
+            out.push(AttachmentMeta {
+                attachment_id: attachment_id.clone(),
+                filename,
+                mime_type: part
+                    .mime_type
+                    .clone()
+                    .unwrap_or_else(|| "application/octet-stream".to_string()),
+                size: body.size,
+            });
         }
     }
 
@@ -484,6 +499,40 @@ struct GmailSendResponse {
     id: String,
     #[serde(rename = "threadId")]
     thread_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GmailSendAsListResponse {
+    #[serde(rename = "sendAs")]
+    send_as: Option<Vec<GmailSendAsResource>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GmailSendAsResource {
+    send_as_email: String,
+    display_name: Option<String>,
+    #[serde(default)]
+    is_primary: bool,
+    #[serde(default)]
+    is_default: bool,
+    verification_status: Option<String>,
+}
+
+impl GmailSendAsResource {
+    /// Project the raw resource into a `SendAsView`, dropping empty display names.
+    fn into_view(self) -> SendAsView {
+        SendAsView {
+            email: self.send_as_email,
+            display_name: self
+                .display_name
+                .map(|name| name.trim().to_string())
+                .filter(|name| !name.is_empty()),
+            is_primary: self.is_primary,
+            is_default: self.is_default,
+            verification_status: self.verification_status,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

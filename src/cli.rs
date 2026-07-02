@@ -28,6 +28,7 @@ pub enum Command {
     Get(GetArgs),
     Label(LabelArgs),
     Attachments(AttachmentsArgs),
+    Aliases(AliasesArgs),
 }
 
 #[derive(Debug, Args)]
@@ -75,6 +76,11 @@ pub struct SendArgs {
     pub reply: Option<String>,
     #[arg(long, action = ArgAction::Append, help = "Attach file (repeatable)")]
     pub attach: Vec<PathBuf>,
+    #[arg(
+        long,
+        help = "Send from this address (must be a verified send-as alias; see `gmail aliases ls`)"
+    )]
+    pub from: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -120,6 +126,18 @@ pub struct AttachmentsGetArgs {
     pub index: Option<usize>,
     #[arg(long, help = "Only download attachments matching this filename")]
     pub name: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct AliasesArgs {
+    #[command(subcommand)]
+    pub command: AliasesCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AliasesCommand {
+    #[command(visible_alias = "list")]
+    Ls,
 }
 
 #[derive(Debug, Args)]

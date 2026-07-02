@@ -21,5 +21,6 @@ pub async fn run(cli: Cli) -> AppResult<()> {
         Command::Get(args) => commands::get::run(&ctx, args).await,
         Command::Label(args) => commands::label::run(&ctx, args.command).await,
         Command::Attachments(args) => commands::attachments::run(&ctx, args.command).await,
+        Command::Aliases(args) => commands::aliases::run(&ctx, args.command).await,
     }
 }

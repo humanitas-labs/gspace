@@ -1,5 +1,5 @@
 use clap::Parser;
-use gmail::cli::{AuthCommand, Cli, Command};
+use gmail::cli::{AliasesCommand, AuthCommand, Cli, Command};
 
 #[test]
 fn parses_auth_login() {
@@ -34,6 +34,8 @@ fn parses_send() {
         "a.txt",
         "--attach",
         "b.txt",
+        "--from",
+        "alias@example.com",
     ])
     .expect("cli parse should work");
     match cli.command {
@@ -42,8 +44,21 @@ fn parses_send() {
             assert_eq!(send.subject.as_deref(), Some("hi"));
             assert_eq!(send.body.as_deref(), Some("hello"));
             assert_eq!(send.attach.len(), 2);
+            assert_eq!(send.from.as_deref(), Some("alias@example.com"));
         }
         _ => panic!("expected send command"),
+    }
+}
+
+#[test]
+fn parses_aliases_ls() {
+    for subcommand in ["ls", "list"] {
+        let cli =
+            Cli::try_parse_from(["gmail", "aliases", subcommand]).expect("cli parse should work");
+        match cli.command {
+            Command::Aliases(aliases) => assert!(matches!(aliases.command, AliasesCommand::Ls)),
+            _ => panic!("expected aliases command"),
+        }
     }
 }
 

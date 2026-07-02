@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.5.0] - 2026-07-02
+
+### Added
+
+- `gmail send --from <address>` — send from a Gmail send-as alias. The address
+  is validated against the account's aliases (`users/me/settings/sendAs`):
+  unknown or unverified aliases fail with an error instead of Gmail silently
+  rewriting the From header to the primary address. The alias's display name is
+  used when set, falling back to `sender_name` / the token's name.
+- `send_from` profile setting — default From address applied when `--from` is
+  absent. Plain sends (no flag, no setting) skip the alias lookup entirely, so
+  existing usage gains no extra API call.
+- `gmail aliases ls` (alias: `list`) — list send-as aliases with display name,
+  primary/default flags, and verification status.
+
 ## [0.4.0] - 2026-06-30
 
 ### Changed
