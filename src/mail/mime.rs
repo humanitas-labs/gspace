@@ -138,7 +138,10 @@ fn build_base_headers(request: &SendRequest) -> Vec<String> {
         headers.push(format!("Bcc: {}", request.bcc.join(", ")));
     }
 
-    headers.push(format!("Subject: {}", request.subject));
+    headers.push(format!(
+        "Subject: {}",
+        encode_header_text(&request.subject)
+    ));
     headers.push("MIME-Version: 1.0".to_string());
     if let Some(in_reply_to) = &request.in_reply_to {
         headers.push(format!("In-Reply-To: {in_reply_to}"));
@@ -204,4 +207,35 @@ fn random_boundary() -> String {
 /// Remove quote characters from a value destined for a quoted header parameter.
 fn escape_header_value(value: &str) -> String {
     value.replace('"', "")
+}
+
+/// Maximum UTF-8 bytes per RFC 2047 encoded word: 42 bytes base64-encode to 56
+/// chars, so a `=?UTF-8?B?...?=` word is 68 chars — inside the 75-char word
+/// limit and, with the `Subject: ` prefix, inside RFC 5322's 78-char line.
+const ENCODED_WORD_MAX_BYTES: usize = 42;
+
+/// Encode header text per RFC 2047 when it contains non-ASCII characters.
+///
+/// ASCII-only text passes through unchanged. Otherwise the text is split into
+/// UTF-8-boundary chunks of at most [`ENCODED_WORD_MAX_BYTES`] bytes, each
+/// emitted as a `=?UTF-8?B?...?=` encoded word, folded with CRLF + space.
+fn encode_header_text(value: &str) -> String {
+    if value.is_ascii() {
+        return value.to_string();
+    }
+
+    let mut words = Vec::new();
+    let mut chunk = String::new();
+    for ch in value.chars() {
+        if chunk.len() + ch.len_utf8() > ENCODED_WORD_MAX_BYTES {
+            words.push(format!("=?UTF-8?B?{}?=", STANDARD.encode(chunk.as_bytes())));
+            chunk.clear();
+        }
+        chunk.push(ch);
+    }
+    if !chunk.is_empty() {
+        words.push(format!("=?UTF-8?B?{}?=", STANDARD.encode(chunk.as_bytes())));
+    }
+
+    words.join("\r\n ")
 }
