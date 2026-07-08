@@ -25,11 +25,15 @@ sending from the primary). The `send_from` profile setting makes an alias the de
 ## Current command tree
 
 ```text
-gmail
+gmail [--profile <name>]   # global; overrides GMAIL_PROFILE and the configured default
   auth
     login
     status
     logout
+  profile
+    list                   # list profiles, marking the default
+    use <name>             # set the default profile
+    show                   # show the profile resolved for this invocation
   list [--inbox] [--limit <n>] [--q <query>]
   send [--reply <id>] [--attach <path> ...]
        [--to ...] [--subject ...] [--from <alias>]
@@ -47,6 +51,31 @@ gmail
 ```
 
 See `docs/architecture.md` for data flow and implementation phases.
+
+## Profiles
+
+Each account is a named profile with its own settings file
+(`profiles/<name>.json`) and token (`tokens/<name>.json`). Every command
+resolves one profile in this order:
+
+1. `--profile <name>` flag
+2. `GMAIL_PROFILE` environment variable
+3. `default_profile` in `config.json` (set via `gmail profile use <name>`)
+4. the sole profile, if only one exists
+5. the profile literally named `default`, if present
+
+If several profiles exist and none of the above picks one, mailbox commands
+error and ask you to set a default; `gmail profile list` / `use` still work so
+you can resolve it. Switch the default with `gmail profile use <name>` — no file
+juggling.
+
+```console
+$ gmail profile list
+  work
+* personal (default)
+$ gmail --profile work list        # one-off override
+$ GMAIL_PROFILE=work gmail list     # session override
+```
 
 ## OAuth setup
 

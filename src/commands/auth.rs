@@ -10,12 +10,13 @@ use crate::error::{AppError, AppResult};
 pub async fn run(ctx: &AppContext, command: AuthCommand) -> AppResult<()> {
     match command {
         AuthCommand::Login => {
+            let profile = ctx.profile()?;
             let settings = ensure_login_settings(ctx)?;
-            let result = match AuthService::login(&ctx.profile, &settings, &ctx.token_store).await {
+            let result = match AuthService::login(profile, &settings, &ctx.token_store).await {
                 Ok(result) => result,
                 Err(AppError::Auth(message)) if missing_client_secret_error(&message) => {
                     let settings = prompt_for_missing_client_secret(ctx, &settings, &message)?;
-                    AuthService::login(&ctx.profile, &settings, &ctx.token_store).await?
+                    AuthService::login(profile, &settings, &ctx.token_store).await?
                 }
                 Err(err) => return Err(err),
             };
@@ -28,7 +29,7 @@ pub async fn run(ctx: &AppContext, command: AuthCommand) -> AppResult<()> {
             ctx.output.emit(&text, &result)
         }
         AuthCommand::Status => {
-            let status = AuthService::status(&ctx.profile, &ctx.token_store).await?;
+            let status = AuthService::status(ctx.profile()?, &ctx.token_store).await?;
             let text = if status.logged_in {
                 let refresh_hint = status
                     .has_refresh_token
@@ -57,7 +58,7 @@ pub async fn run(ctx: &AppContext, command: AuthCommand) -> AppResult<()> {
             ctx.output.emit(&text, &status)
         }
         AuthCommand::Logout => {
-            let status = AuthService::logout(&ctx.profile, &ctx.token_store).await?;
+            let status = AuthService::logout(ctx.profile()?, &ctx.token_store).await?;
             let text = format!("{}: logged out", status.profile);
             ctx.output.emit(&text, &status)
         }
@@ -66,6 +67,7 @@ pub async fn run(ctx: &AppContext, command: AuthCommand) -> AppResult<()> {
 
 /// Ensure client_id/client_secret are set, prompting interactively and saving them when missing.
 fn ensure_login_settings(ctx: &AppContext) -> AppResult<Settings> {
+    let profile = ctx.profile()?;
     let mut settings = ctx.settings.clone();
     let missing_client_id = settings
         .client_id
@@ -82,7 +84,7 @@ fn ensure_login_settings(ctx: &AppContext) -> AppResult<Settings> {
         return Ok(settings);
     }
 
-    let settings_path = ctx.paths.settings_file(&ctx.profile);
+    let settings_path = ctx.paths.settings_file(profile);
     if !io::stdin().is_terminal() {
         let missing = format_missing_fields(missing_client_id, missing_client_secret);
         return Err(AppError::Config(format!(
@@ -91,10 +93,7 @@ fn ensure_login_settings(ctx: &AppContext) -> AppResult<Settings> {
         )));
     }
 
-    println!(
-        "OAuth client config is missing for profile `{}`.",
-        ctx.profile
-    );
+    println!("OAuth client config is missing for profile `{profile}`.");
     println!("Settings will be saved to {}.", settings_path.display());
 
     if missing_client_id {
@@ -114,7 +113,7 @@ fn ensure_login_settings(ctx: &AppContext) -> AppResult<Settings> {
         redirect_uri
     });
 
-    config::save_settings(&ctx.paths, &ctx.profile, &settings)?;
+    config::save_settings(&ctx.paths, profile, &settings)?;
     println!("Saved profile settings to {}.", settings_path.display());
 
     Ok(settings)
@@ -178,7 +177,8 @@ fn prompt_for_missing_client_secret(
         return Err(AppError::Auth(original_error.to_string()));
     }
 
-    let settings_path = ctx.paths.settings_file(&ctx.profile);
+    let profile = ctx.profile()?;
+    let settings_path = ctx.paths.settings_file(profile);
     if !io::stdin().is_terminal() {
         return Err(AppError::Auth(format!(
             "{original_error}. add client_secret to {}",
@@ -191,7 +191,7 @@ fn prompt_for_missing_client_secret(
 
     let mut updated = settings.clone();
     updated.client_secret = Some(client_secret);
-    config::save_settings(&ctx.paths, &ctx.profile, &updated)?;
+    config::save_settings(&ctx.paths, profile, &updated)?;
     println!("Updated profile settings at {}.", settings_path.display());
 
     Ok(updated)

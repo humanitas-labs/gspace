@@ -123,7 +123,7 @@ async fn resolve_from_header(
     access_token: &str,
     from_override: Option<&str>,
 ) -> AppResult<Option<String>> {
-    let token = ctx.token_store.load(&ctx.profile)?;
+    let token = ctx.token_store.load(ctx.profile()?)?;
 
     if let Some(requested) = from_override {
         let alias = resolve_send_as_alias(ctx, access_token, requested).await?;

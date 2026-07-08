@@ -37,6 +37,29 @@ impl AppPaths {
         })
     }
 
+    /// Path to the top-level app config JSON file.
+    pub fn config_file(&self) -> PathBuf {
+        self.config_dir.join("config.json")
+    }
+
+    /// Names of all profiles that have a settings file on disk, sorted.
+    pub fn list_profiles(&self) -> AppResult<Vec<String>> {
+        let mut names = Vec::new();
+        if self.profiles_dir.exists() {
+            for entry in fs::read_dir(&self.profiles_dir)? {
+                let path = entry?.path();
+                if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+                    names.push(stem.to_string());
+                }
+            }
+        }
+        names.sort();
+        Ok(names)
+    }
+
     /// Path to a profile's settings JSON file.
     pub fn settings_file(&self, profile: &str) -> PathBuf {
         self.profiles_dir.join(format!("{profile}.json"))

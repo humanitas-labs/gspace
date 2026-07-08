@@ -8,10 +8,9 @@ pub struct Cli {
     #[arg(
         long,
         global = true,
-        default_value = "default",
-        help = "Profile name to use"
+        help = "Profile name to use (overrides GMAIL_PROFILE and the configured default)"
     )]
-    pub profile: String,
+    pub profile: Option<String>,
     #[arg(long, global = true, help = "Emit JSON output")]
     pub json: bool,
     #[arg(short = 'v', long, global = true, action = ArgAction::Count, help = "Verbose logging")]
@@ -23,6 +22,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Auth(AuthArgs),
+    Profile(ProfileArgs),
     List(ListArgs),
     Send(SendArgs),
     Get(GetArgs),
@@ -52,6 +52,25 @@ pub enum AuthCommand {
     Login,
     Status,
     Logout,
+}
+
+#[derive(Debug, Args)]
+pub struct ProfileArgs {
+    #[command(subcommand)]
+    pub command: ProfileCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfileCommand {
+    /// List profiles and show which is the default
+    List,
+    /// Set the default profile used when none is passed
+    Use {
+        /// Name of an existing profile
+        name: String,
+    },
+    /// Show the profile that resolves for this invocation
+    Show,
 }
 
 #[derive(Debug, Args)]
