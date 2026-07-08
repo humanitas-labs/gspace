@@ -6,3 +6,4 @@ pub mod label;
 pub mod list;
 pub mod profile;
 pub mod send;
+pub mod signature;

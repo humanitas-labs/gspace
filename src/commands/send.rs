@@ -30,7 +30,7 @@ async fn build_send_request(
     access_token: &str,
     args: SendArgs,
 ) -> AppResult<SendRequest> {
-    let body_markdown = read_body(&args)?;
+    let body_markdown = apply_signature(ctx, &args, read_body(&args)?);
     let body = mime::markdown_to_html(&body_markdown);
     let attachments = read_attachments(&args.attach)?;
     let from_override = args.from.clone().or_else(|| ctx.settings.send_from.clone());
@@ -220,6 +220,44 @@ fn sanitize_header_value(input: &str) -> String {
         .collect()
 }
 
+/// Append the signature to the body markdown, unless suppressed. An inline
+/// `--signature` overrides the profile's `signature` setting; `--no-signature`
+/// skips it entirely. Each signature line becomes a hard break so multi-line
+/// signatures render as written rather than collapsing into one paragraph.
+fn apply_signature(ctx: &AppContext, args: &SendArgs, body_markdown: String) -> String {
+    if args.no_signature {
+        return body_markdown;
+    }
+
+    let signature = args
+        .signature
+        .as_deref()
+        .or(ctx.settings.signature.as_deref());
+    compose_with_signature(body_markdown, signature)
+}
+
+/// Append `signature` (if non-blank) below the body, one blank line apart. Each
+/// signature line gets a markdown hard break so it renders as written rather
+/// than collapsing into a single paragraph.
+fn compose_with_signature(body_markdown: String, signature: Option<&str>) -> String {
+    let Some(signature) = signature.filter(|sig| !sig.trim().is_empty()) else {
+        return body_markdown;
+    };
+
+    let signature_md = signature
+        .trim_matches(['\r', '\n'])
+        .lines()
+        .collect::<Vec<_>>()
+        .join("  \n");
+
+    let body = body_markdown.trim_end_matches(['\r', '\n', ' ']);
+    if body.is_empty() {
+        signature_md
+    } else {
+        format!("{body}\n\n{signature_md}")
+    }
+}
+
 /// Read the message body from exactly one of --body, --body-file, --draft-file, or --stdin.
 fn read_body(args: &SendArgs) -> AppResult<String> {
     let mut selected = 0;
@@ -324,5 +362,45 @@ fn merge_references(existing: Option<String>, message_id: Option<String>) -> Opt
         None
     } else {
         Some(refs.join(" "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::compose_with_signature;
+
+    const SIG: &str = "Jane Doe\nExample Studio\nexample.net";
+
+    #[test]
+    fn appends_signature_with_hard_breaks_below_body() {
+        let out = compose_with_signature("Hey there.".to_string(), Some(SIG));
+        assert_eq!(
+            out,
+            "Hey there.\n\nJane Doe  \nExample Studio  \nexample.net"
+        );
+    }
+
+    #[test]
+    fn none_signature_leaves_body_untouched() {
+        let out = compose_with_signature("Hey there.".to_string(), None);
+        assert_eq!(out, "Hey there.");
+    }
+
+    #[test]
+    fn blank_signature_is_ignored() {
+        let out = compose_with_signature("Hey there.".to_string(), Some("   \n  "));
+        assert_eq!(out, "Hey there.");
+    }
+
+    #[test]
+    fn empty_body_yields_signature_only() {
+        let out = compose_with_signature("".to_string(), Some("Jane Doe"));
+        assert_eq!(out, "Jane Doe");
+    }
+
+    #[test]
+    fn trailing_body_whitespace_is_collapsed_before_gap() {
+        let out = compose_with_signature("Body.\n\n".to_string(), Some("Sig"));
+        assert_eq!(out, "Body.\n\nSig");
     }
 }

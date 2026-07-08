@@ -23,6 +23,7 @@ pub struct Cli {
 pub enum Command {
     Auth(AuthArgs),
     Profile(ProfileArgs),
+    Signature(SignatureArgs),
     List(ListArgs),
     Send(SendArgs),
     Get(GetArgs),
@@ -74,6 +75,30 @@ pub enum ProfileCommand {
 }
 
 #[derive(Debug, Args)]
+pub struct SignatureArgs {
+    #[command(subcommand)]
+    pub command: SignatureCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SignatureCommand {
+    /// Show the active profile's signature
+    Show,
+    /// Set the active profile's signature (use literal newlines for multiple lines)
+    Set {
+        /// Signature text (markdown); multi-line supported
+        text: String,
+    },
+    /// Set the signature from a file
+    SetFile {
+        /// Path to a file containing the signature
+        path: PathBuf,
+    },
+    /// Remove the active profile's signature
+    Clear,
+}
+
+#[derive(Debug, Args)]
 pub struct SendArgs {
     #[arg(long, value_delimiter = ',', num_args = 1.., help = "Recipient addresses")]
     pub to: Vec<String>,
@@ -100,6 +125,14 @@ pub struct SendArgs {
         help = "Send from this address (must be a verified send-as alias; see `gmail aliases ls`)"
     )]
     pub from: Option<String>,
+    #[arg(
+        long,
+        conflicts_with = "no_signature",
+        help = "Override the profile signature for this send (markdown)"
+    )]
+    pub signature: Option<String>,
+    #[arg(long, help = "Do not append the profile signature to this send")]
+    pub no_signature: bool,
 }
 
 #[derive(Debug, Args)]

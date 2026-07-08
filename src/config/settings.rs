@@ -19,6 +19,8 @@ pub struct Settings {
     pub sender_name: Option<String>,
     #[serde(default)]
     pub send_from: Option<String>,
+    #[serde(default)]
+    pub signature: Option<String>,
 }
 
 impl Settings {

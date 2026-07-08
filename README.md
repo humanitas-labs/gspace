@@ -34,9 +34,15 @@ gmail [--profile <name>]   # global; overrides GMAIL_PROFILE and the configured 
     list                   # list profiles, marking the default
     use <name>             # set the default profile
     show                   # show the profile resolved for this invocation
+  signature
+    show                   # show the active profile's signature
+    set <text>             # set it (literal newlines for multiple lines)
+    set-file <path>        # set it from a file
+    clear                  # remove it
   list [--inbox] [--limit <n>] [--q <query>]
   send [--reply <id>] [--attach <path> ...]
        [--to ...] [--subject ...] [--from <alias>]
+       [--signature <text> | --no-signature]
        (--body ... | --body-file ... | --draft-file ... | --stdin)
   get <id>
   label
@@ -76,6 +82,23 @@ $ gmail profile list
 $ gmail --profile work list        # one-off override
 $ GMAIL_PROFILE=work gmail list     # session override
 ```
+
+## Signatures
+
+Each profile can carry a signature that `send` appends below the body, one
+blank line down, with each line hard-broken so it renders as written. It is
+markdown, like the body.
+
+```console
+$ gmail signature set "Jane Doe
+Example Studio
+example.net"
+$ gmail send --to a@b.com --subject Hi --body "..."      # signature appended
+$ gmail send ... --no-signature                          # suppress for one send
+$ gmail send ... --signature "Sent from my phone"        # override for one send
+```
+
+Stored as the `signature` field in the profile settings file.
 
 ## OAuth setup
 

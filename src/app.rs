@@ -17,6 +17,7 @@ pub async fn run(cli: Cli) -> AppResult<()> {
     match command {
         Command::Auth(args) => commands::auth::run(&ctx, args.command).await,
         Command::Profile(args) => commands::profile::run(&ctx, args.command).await,
+        Command::Signature(args) => commands::signature::run(&ctx, args.command).await,
         Command::List(args) => commands::list::run(&ctx, args).await,
         Command::Send(args) => commands::send::run(&ctx, args).await,
         Command::Get(args) => commands::get::run(&ctx, args).await,
