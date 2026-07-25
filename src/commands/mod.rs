@@ -1,6 +1,7 @@
 pub mod aliases;
 pub mod attachments;
 pub mod auth;
+pub mod calendar;
 pub mod get;
 pub mod label;
 pub mod list;

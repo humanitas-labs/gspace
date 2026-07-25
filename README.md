@@ -1,6 +1,16 @@
-# gmail
+# gspace
 
-Rust scaffold for a Gmail CLI with this command shape:
+Google Workspace CLI toolbox. One crate, one OAuth flow, one profile system;
+each surface ships as its own binary:
+
+- **`gmail`** — Gmail: list, read, send, labels, attachments, aliases
+- **`gcal`** — Google Calendar: create events (with Google Meet links), list, delete
+
+Both binaries share profiles and tokens — `gcal --profile work` uses the
+same login as `gmail --profile work`. Install both with
+`cargo install --path .`.
+
+The Gmail surface has this command shape:
 
 - `gmail auth login`
 - `gmail auth status`
@@ -56,7 +66,44 @@ gmail [--profile <name>]   # global; overrides GMAIL_PROFILE and the configured 
     ls
 ```
 
+```text
+gcal [--profile <name>] [--json]
+  add --title <t> --start <datetime>
+      (--end <datetime> | --duration <mins, default 30>)
+      [--attendees a@x.com,b@y.com] [--meet]
+      [--location <text>] [--notes <text>] [--calendar <id>]
+  list [--today | --tomorrow | --week | --from <d> --to <d>]
+       [--limit <n>] [--calendar <id>]
+  rm <event-id> [--calendar <id>]
+```
+
 See `docs/architecture.md` for data flow and implementation phases.
+
+## Calendar (gcal)
+
+`gcal add` creates events on the profile's primary calendar (override with
+`--calendar`). Datetimes accept RFC 3339, `YYYY-MM-DD HH:MM`, and
+`today HH:MM` / `tomorrow HH:MM`, interpreted in local time.
+
+`--meet` attaches a Google Meet conference and prints the link. Attendees each
+receive a Google invite email (`sendUpdates=all`); `gcal rm` sends
+cancellations the same way.
+
+```console
+$ gcal add --title "Weekly sync" --start "tomorrow 10:00" --duration 30 \
+           --attendees alex@example.com --meet
+event created: Weekly sync
+  id: k2j4...
+  when: Sun 2026.07.26 10:00–10:30
+  attendees: alex@example.com
+  meet: https://meet.google.com/abc-defg-hij
+  event: https://www.google.com/calendar/event?eid=...
+```
+
+Calendar access uses the `calendar.events` OAuth scope. Profiles authorized
+before this scope existed need a one-time `gmail auth login` re-run; until
+then `gcal` commands fail with an auth error pointing there. Enable the
+Google Calendar API in the same GCP project as the Gmail API.
 
 ## Profiles
 

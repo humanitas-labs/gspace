@@ -1,17 +1,17 @@
 mod cli {
-    pub use gmail::cli::*;
+    pub use gspace::cli::*;
 }
 
 mod context {
-    pub use gmail::context::*;
+    pub use gspace::context::*;
 }
 
 mod error {
-    pub use gmail::error::*;
+    pub use gspace::error::*;
 }
 
 mod output {
-    pub use gmail::output::*;
+    pub use gspace::output::*;
 }
 
 mod list_under_test {

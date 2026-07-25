@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.6.0] - 2026-07-25
+
+### Added
+
+- `gcal` — second binary in the crate for Google Calendar. `gcal add` creates
+  events (optionally with a Google Meet conference via `--meet`) and emails
+  invites to attendees; `gcal list` shows upcoming events with window flags
+  (`--today`/`--tomorrow`/`--week`/`--from`+`--to`); `gcal rm` deletes an
+  event and sends cancellations. Shares profiles, tokens, and OAuth flow with
+  `gmail`.
+- `calendar.events` added to the OAuth scopes. Existing profiles need a
+  one-time `gmail auth login` re-run before `gcal` works; the error message
+  says so.
+
+### Changed
+
+- Crate renamed `gmail` → `gspace` (repo `dremnik/gmail-cli` →
+  `dremnik/gspace`); it now hosts multiple Google Workspace binaries. The
+  `gmail` binary name and all its commands are unchanged.
+- Shared Google API HTTP transport extracted to `api/http.rs` (`JsonClient`),
+  parameterized by service label and auth recovery hint; the Gmail client now
+  delegates to it.
+
 ## [0.5.0] - 2026-07-02
 
 ### Added

@@ -1,10 +1,17 @@
 [package]
-name = "gmail"
-version = "0.5.0"
+name = "gspace"
+version = "0.6.0"
 edition = "2024"
+
+# The crate is the shared Google Workspace toolbox; each surface ships as its
+# own binary. src/bin/gcal.rs is auto-discovered as the `gcal` binary.
+[[bin]]
+name = "gmail"
+path = "src/main.rs"
 
 [dependencies]
 base64 = "0.22.1"
+chrono = "0.4.41"
 clap = { version = "4.5.32", features = ["derive"] }
 dirs = "6.0.0"
 html-escape = "0.2.13"

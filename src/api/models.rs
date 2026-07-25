@@ -84,6 +84,19 @@ impl SendAsView {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct EventView {
+    pub id: String,
+    pub summary: Option<String>,
+    pub status: Option<String>,
+    pub location: Option<String>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+    pub attendees: Vec<String>,
+    pub meet_link: Option<String>,
+    pub html_link: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct LabelView {
     pub id: String,
     pub name: String,

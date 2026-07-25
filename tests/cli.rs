@@ -1,5 +1,5 @@
 use clap::Parser;
-use gmail::cli::{AliasesCommand, AuthCommand, Cli, Command};
+use gspace::cli::{AliasesCommand, AuthCommand, Cli, Command};
 
 #[test]
 fn parses_auth_login() {

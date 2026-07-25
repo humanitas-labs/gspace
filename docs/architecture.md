@@ -2,12 +2,12 @@
 
 ## Goal
 
-Provide a composable Rust CLI named `gmail` with stable command UX first, then layer OAuth and Gmail API implementations behind clear module boundaries.
+One crate (`gspace`) hosting Google Workspace CLIs behind clear module boundaries. Shared plumbing — OAuth, profiles, token storage, HTTP transport, output — lives in the library; each product surface ships as its own binary (`gmail`, `gcal`). Adding a surface means a new `src/bin/` entry, a service client, and a command module; auth and profiles come for free.
 
 ## Runtime flow
 
-1. `src/main.rs` parses CLI args and calls `gmail::run`.
-2. `src/app.rs` builds `AppContext` from profile/output flags and dispatches to a command handler.
+1. `src/main.rs` (the `gmail` binary) parses CLI args and calls `gspace::run`; `src/bin/gcal.rs` parses its own `GcalCli` and calls `gspace::gcal::run`.
+2. `src/app.rs` / `src/gcal.rs` build the shared `AppContext` from profile/output flags and dispatch to a command handler.
 3. `src/commands/*` validates args and orchestrates auth/token/API calls.
 4. `src/output/*` renders results as text or JSON.
 
@@ -23,11 +23,14 @@ Provide a composable Rust CLI named `gmail` with stable command UX first, then l
   - Implements browser OAuth code flow with PKCE and local callback capture.
 - `api`
   - Owns API-facing model types and endpoint helpers.
+  - `http::JsonClient` is the shared bearer-auth JSON transport (base URL + service label + auth recovery hint); service clients wrap it.
   - Exposes `GmailClient` methods for `list`, `get`, `send`, and `label` operations.
+  - Exposes `CalendarClient` methods for event insert (with Meet conference requests), list, and delete.
 - `commands`
   - Maps command args to service calls.
   - Keeps business rules local to command behavior.
   - Prompts for missing OAuth profile settings during `auth login`.
+  - `commands/calendar` owns gcal handlers plus local datetime parsing (`YYYY-MM-DD HH:MM`, `today HH:MM`, RFC 3339).
 - `mail`
   - Handles MIME construction and encoding concerns.
 - `output`
@@ -46,7 +49,7 @@ Provide a composable Rust CLI named `gmail` with stable command UX first, then l
 - Token endpoint: `https://oauth2.googleapis.com/token`
 - Revoke endpoint: `https://oauth2.googleapis.com/revoke`
 - Userinfo endpoint: `https://openidconnect.googleapis.com/v1/userinfo`
-- Scopes: `gmail.modify`, `gmail.send`, `openid`, `email`, `profile`
+- Scopes: `gmail.modify`, `gmail.send`, `calendar.events`, `openid`, `email`, `profile` (tokens issued before `calendar.events` was added need a one-time re-login)
 - Redirect URI: profile setting `redirect_uri`, default `http://127.0.0.1:8787/callback`
 - Token refresh: `AppContext::access_token` auto-refreshes expired access tokens when refresh token exists.
 

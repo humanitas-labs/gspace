@@ -1,21 +1,25 @@
 mod error {
-    pub use gmail::error::*;
+    pub use gspace::error::*;
+}
+
+mod http {
+    pub use gspace::api::http::*;
 }
 
 mod labels {
-    pub use gmail::api::labels::*;
+    pub use gspace::api::labels::*;
 }
 
 mod messages {
-    pub use gmail::api::messages::*;
+    pub use gspace::api::messages::*;
 }
 
 mod models {
-    pub use gmail::api::models::*;
+    pub use gspace::api::models::*;
 }
 
 mod send_as {
-    pub use gmail::api::send_as::*;
+    pub use gspace::api::send_as::*;
 }
 
 mod client_under_test {
@@ -245,33 +249,4 @@ mod client_under_test {
         assert!(!pending.is_sendable());
     }
 
-    #[test]
-    fn maps_unauthorized_as_auth_error() {
-        let error = map_api_error(
-            StatusCode::UNAUTHORIZED,
-            r#"{"error":{"code":401,"message":"Request had invalid authentication credentials.","status":"UNAUTHENTICATED"}}"#,
-        );
-
-        match error {
-            AppError::Auth(message) => {
-                assert!(message.contains("invalid authentication credentials"));
-            }
-            other => panic!("expected auth error, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn maps_not_found_as_api_error() {
-        let error = map_api_error(
-            StatusCode::NOT_FOUND,
-            r#"{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}"#,
-        );
-
-        match error {
-            AppError::Api(message) => {
-                assert!(message.contains("Requested entity was not found"));
-            }
-            other => panic!("expected api error, got {other:?}"),
-        }
-    }
 }

@@ -1,17 +1,17 @@
 mod config {
-    pub use gmail::config::*;
+    pub use gspace::config::*;
 }
 
 mod error {
-    pub use gmail::error::*;
+    pub use gspace::error::*;
 }
 
 mod token {
-    pub use gmail::auth::token::*;
+    pub use gspace::auth::token::*;
 }
 
 mod token_store {
-    pub use gmail::auth::token_store::*;
+    pub use gspace::auth::token_store::*;
 }
 
 mod oauth_under_test {

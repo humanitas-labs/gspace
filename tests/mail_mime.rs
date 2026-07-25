@@ -1,8 +1,8 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
-use gmail::api::models::{Attachment, SendRequest};
-use gmail::mail::mime::{build_raw_message, markdown_to_html};
+use gspace::api::models::{Attachment, SendRequest};
+use gspace::mail::mime::{build_raw_message, markdown_to_html};
 
 #[test]
 fn renders_markdown_body_inside_html_template() {

@@ -1,13 +1,12 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use url::Url;
 
 use crate::error::{AppError, AppResult};
 
+use super::http::JsonClient;
 use super::labels;
 use super::messages;
 use super::models::{
@@ -20,16 +19,14 @@ const GMAIL_API_BASE_URL: &str = "https://gmail.googleapis.com";
 
 #[derive(Debug, Clone)]
 pub struct GmailClient {
-    http: Client,
-    base_url: String,
+    inner: JsonClient,
 }
 
 impl GmailClient {
     /// Construct a client targeting the public Gmail API base URL.
     pub fn new() -> Self {
         Self {
-            http: Client::new(),
-            base_url: GMAIL_API_BASE_URL.to_string(),
+            inner: JsonClient::new(GMAIL_API_BASE_URL, "gmail", "run `gmail auth login`"),
         }
     }
 
@@ -263,14 +260,7 @@ impl GmailClient {
         access_token: &str,
         query: Option<&[(String, String)]>,
     ) -> AppResult<T> {
-        let url = self.endpoint_url(endpoint)?;
-        let mut request = self.http.get(url).bearer_auth(access_token);
-        if let Some(query) = query {
-            request = request.query(query);
-        }
-
-        let response = request.send().await?;
-        self.parse_json_response(response).await
+        self.inner.get_json(endpoint, access_token, query).await
     }
 
     /// Issue a bearer-authenticated POST with a JSON body and deserialize the JSON response.
@@ -280,37 +270,9 @@ impl GmailClient {
         access_token: &str,
         body: &B,
     ) -> AppResult<T> {
-        let url = self.endpoint_url(endpoint)?;
-        let response = self
-            .http
-            .post(url)
-            .bearer_auth(access_token)
-            .json(body)
-            .send()
-            .await?;
-
-        self.parse_json_response(response).await
-    }
-
-    /// Join an endpoint path onto the client's base URL.
-    fn endpoint_url(&self, endpoint: &str) -> AppResult<Url> {
-        let mut url = Url::parse(&self.base_url)?;
-        url.set_path(endpoint.trim_start_matches('/'));
-        Ok(url)
-    }
-
-    /// Deserialize a successful response, or convert an error status + body into an `AppError`.
-    async fn parse_json_response<T: DeserializeOwned>(
-        &self,
-        response: reqwest::Response,
-    ) -> AppResult<T> {
-        let status = response.status();
-        if status.is_success() {
-            return Ok(response.json().await?);
-        }
-
-        let body = response.text().await.unwrap_or_default();
-        Err(map_api_error(status, &body))
+        self.inner
+            .post_json(endpoint, access_token, body, None)
+            .await
     }
 }
 
@@ -565,24 +527,6 @@ struct GmailMessageHeader {
     value: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct GmailApiErrorEnvelope {
-    error: GmailApiError,
-}
-
-#[derive(Debug, Deserialize)]
-struct GmailApiError {
-    code: Option<u16>,
-    status: Option<String>,
-    message: Option<String>,
-    errors: Option<Vec<GmailApiErrorDetail>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GmailApiErrorDetail {
-    reason: Option<String>,
-}
-
 /// Find a header by case-insensitive name, returning its trimmed value if non-empty.
 fn header_value(headers: &[GmailMessageHeader], target: &str) -> Option<String> {
     headers
@@ -590,56 +534,4 @@ fn header_value(headers: &[GmailMessageHeader], target: &str) -> Option<String> 
         .find(|header| header.name.eq_ignore_ascii_case(target))
         .map(|header| header.value.trim().to_string())
         .filter(|value| !value.is_empty())
-}
-
-/// Map an HTTP error status and body into an `AppError`, routing 401/403 to an auth error.
-fn map_api_error(status: StatusCode, body: &str) -> AppError {
-    let message = parse_api_error_message(body).unwrap_or_else(|| {
-        let body = body.trim();
-        if body.is_empty() {
-            "no error details in response body".to_string()
-        } else {
-            body.to_string()
-        }
-    });
-
-    if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-        return AppError::Auth(format!(
-            "gmail api authorization failed ({status}): {message}. run `gmail auth login`"
-        ));
-    }
-
-    AppError::Api(format!("gmail api request failed ({status}): {message}"))
-}
-
-/// Parse Gmail's JSON error envelope into a compact `message, status, code, reason` string.
-fn parse_api_error_message(body: &str) -> Option<String> {
-    let envelope = serde_json::from_str::<GmailApiErrorEnvelope>(body).ok()?;
-    let mut parts = Vec::new();
-
-    if let Some(message) = envelope.error.message {
-        parts.push(message);
-    }
-
-    if let Some(status) = envelope.error.status {
-        parts.push(format!("status={status}"));
-    }
-
-    if let Some(code) = envelope.error.code {
-        parts.push(format!("code={code}"));
-    }
-
-    if let Some(reason) = envelope
-        .error
-        .errors
-        .and_then(|errors| errors.into_iter().find_map(|detail| detail.reason))
-    {
-        parts.push(format!("reason={reason}"));
-    }
-
-    if parts.is_empty() {
-        return None;
-    }
-
-    Some(parts.join(", "))
 }

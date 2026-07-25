@@ -1,3 +1,4 @@
+use crate::api::calendar::CalendarClient;
 use crate::api::client::GmailClient;
 use crate::auth::token_store::TokenStore;
 use crate::auth::{AuthService, FileTokenStore};
@@ -14,6 +15,7 @@ pub struct AppContext {
     pub settings: Settings,
     pub token_store: FileTokenStore,
     pub gmail_client: GmailClient,
+    pub calendar_client: CalendarClient,
     pub output: Output,
 }
 
@@ -43,6 +45,7 @@ impl AppContext {
         let settings = config::load_settings(&paths, &profile)?;
         let token_store = FileTokenStore::new(paths.clone());
         let gmail_client = GmailClient::new();
+        let calendar_client = CalendarClient::new();
         let output = Output::new(json);
 
         Ok(Self {
@@ -53,6 +56,7 @@ impl AppContext {
             settings,
             token_store,
             gmail_client,
+            calendar_client,
             output,
         })
     }
