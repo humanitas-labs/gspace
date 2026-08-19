@@ -25,6 +25,8 @@ pub struct GcalCli {
 pub enum GcalCommand {
     /// Create an event, optionally with a Google Meet link
     Add(GcalAddArgs),
+    /// Update fields of an existing event in place, keeping its id and Meet link
+    Edit(GcalEditArgs),
     /// List upcoming events
     List(GcalListArgs),
     /// Delete an event, sending cancellations to attendees
@@ -57,6 +59,36 @@ pub struct GcalAddArgs {
     #[arg(long, help = "Event description")]
     pub notes: Option<String>,
     #[arg(long, default_value = "primary", help = "Calendar id to create the event on")]
+    pub calendar: String,
+}
+
+#[derive(Debug, Args)]
+pub struct GcalEditArgs {
+    #[arg(help = "Event id (from `gcal add` or `gcal list`)")]
+    pub event_id: String,
+    #[arg(long, help = "New event title")]
+    pub title: Option<String>,
+    #[arg(
+        long,
+        help = "New start time (RFC 3339, `YYYY-MM-DD HH:MM`, `today HH:MM`, `tomorrow HH:MM`); \
+                keeps the event's duration unless --end or --duration is given"
+    )]
+    pub start: Option<String>,
+    #[arg(long, conflicts_with = "duration", help = "New end time (same forms as --start)")]
+    pub end: Option<String>,
+    #[arg(long, help = "New duration in minutes, measured from the (possibly new) start")]
+    pub duration: Option<u32>,
+    #[arg(
+        long,
+        value_delimiter = ',',
+        help = "Attendee emails, comma-separated; replaces the current attendee list"
+    )]
+    pub attendees: Option<Vec<String>>,
+    #[arg(long, help = "New event location")]
+    pub location: Option<String>,
+    #[arg(long, help = "New event description")]
+    pub notes: Option<String>,
+    #[arg(long, default_value = "primary", help = "Calendar id the event lives on")]
     pub calendar: String,
 }
 
@@ -99,6 +131,7 @@ pub async fn run(cli: GcalCli) -> AppResult<()> {
 
     match command {
         GcalCommand::Add(args) => calendar::add::run(&ctx, args).await,
+        GcalCommand::Edit(args) => calendar::edit::run(&ctx, args).await,
         GcalCommand::List(args) => calendar::list::run(&ctx, args).await,
         GcalCommand::Rm(args) => calendar::rm::run(&ctx, args).await,
     }

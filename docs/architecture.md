@@ -25,7 +25,7 @@ One crate (`gspace`) hosting Google Workspace CLIs behind clear module boundarie
   - Owns API-facing model types and endpoint helpers.
   - `http::JsonClient` is the shared bearer-auth JSON transport (base URL + service label + auth recovery hint); service clients wrap it.
   - Exposes `GmailClient` methods for `list`, `get`, `send`, and `label` operations.
-  - Exposes `CalendarClient` methods for event insert (with Meet conference requests), list, and delete.
+  - Exposes `CalendarClient` methods for event insert (with Meet conference requests), get, patch (field-level `events.patch` updates), list, and delete.
 - `commands`
   - Maps command args to service calls.
   - Keeps business rules local to command behavior.

@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [Unreleased]
+
+### Added
+
+- `gcal edit <event-id>` — update an event in place via `events.patch`
+  (`sendUpdates=all`), so the event id and Meet link survive and attendees get
+  a single "updated event" email instead of a cancellation plus a new invite.
+  Flags mirror `add` (`--title`, `--start`, `--end` | `--duration`,
+  `--attendees` (replaces the list), `--location`, `--notes`, `--calendar`);
+  `--start` alone shifts the event and preserves its duration. Recurrence and
+  per-instance edits are out of scope. (#1)
+
 ## [0.6.0] - 2026-07-25
 
 ### Added

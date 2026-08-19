@@ -65,6 +65,24 @@ impl JsonClient {
         self.parse_json_response(response).await
     }
 
+    /// Issue a PATCH with a JSON body and optional query params, deserializing the response.
+    pub async fn patch_json<T: DeserializeOwned, B: Serialize>(
+        &self,
+        endpoint: &str,
+        access_token: &str,
+        body: &B,
+        query: Option<&[(String, String)]>,
+    ) -> AppResult<T> {
+        let url = self.endpoint_url(endpoint)?;
+        let mut request = self.http.patch(url).bearer_auth(access_token).json(body);
+        if let Some(query) = query {
+            request = request.query(query);
+        }
+
+        let response = request.send().await?;
+        self.parse_json_response(response).await
+    }
+
     /// Issue a DELETE with optional query params, expecting an empty success body.
     pub async fn delete(
         &self,

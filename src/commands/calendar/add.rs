@@ -68,7 +68,7 @@ pub async fn run(ctx: &AppContext, args: GcalAddArgs) -> AppResult<()> {
 
 /// Trim attendee entries, drop empties, and reject anything that isn't
 /// email-shaped so a typo fails here instead of becoming a silent no-op invite.
-fn normalize_attendees(raw: &[String]) -> AppResult<Vec<String>> {
+pub(crate) fn normalize_attendees(raw: &[String]) -> AppResult<Vec<String>> {
     let mut out = Vec::new();
     for entry in raw {
         let email = entry.trim();

@@ -48,6 +48,65 @@ fn add_rejects_end_with_duration() {
 }
 
 #[test]
+fn parses_edit_with_all_field_flags() {
+    let cli = GcalCli::try_parse_from([
+        "gcal",
+        "edit",
+        "evt-1",
+        "--title",
+        "renamed sync",
+        "--start",
+        "tomorrow 11:00",
+        "--duration",
+        "45",
+        "--attendees",
+        "alex@example.com,sam@example.com",
+        "--location",
+        "Meet",
+        "--notes",
+        "moved per dan",
+    ])
+    .expect("args should parse");
+
+    match cli.command {
+        GcalCommand::Edit(args) => {
+            assert_eq!(args.event_id, "evt-1");
+            assert_eq!(args.title.as_deref(), Some("renamed sync"));
+            assert_eq!(args.start.as_deref(), Some("tomorrow 11:00"));
+            assert_eq!(args.duration, Some(45));
+            assert_eq!(
+                args.attendees,
+                Some(vec!["alex@example.com".to_string(), "sam@example.com".to_string()])
+            );
+            assert_eq!(args.location.as_deref(), Some("Meet"));
+            assert_eq!(args.notes.as_deref(), Some("moved per dan"));
+            assert_eq!(args.calendar, "primary");
+        }
+        other => panic!("expected edit, got {other:?}"),
+    }
+}
+
+#[test]
+fn edit_rejects_end_with_duration() {
+    let result = GcalCli::try_parse_from([
+        "gcal",
+        "edit",
+        "evt-1",
+        "--end",
+        "2026-07-28 11:00",
+        "--duration",
+        "45",
+    ]);
+
+    assert!(result.is_err(), "--end and --duration must conflict");
+}
+
+#[test]
+fn edit_requires_event_id() {
+    assert!(GcalCli::try_parse_from(["gcal", "edit", "--title", "x"]).is_err());
+}
+
+#[test]
 fn list_window_flags_conflict() {
     assert!(GcalCli::try_parse_from(["gcal", "list", "--today", "--week"]).is_err());
     assert!(GcalCli::try_parse_from(["gcal", "list", "--from", "2026-07-28"]).is_err());

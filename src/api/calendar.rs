@@ -27,6 +27,19 @@ pub struct EventDraft {
     pub request_id: String,
 }
 
+/// Field-level changes for `events.patch`, as assembled by the `gcal edit`
+/// command. `None` fields are omitted from the request body and left untouched
+/// on the event; `start`/`end` are RFC 3339 timestamps with offset.
+#[derive(Debug, Clone, Default)]
+pub struct EventPatch {
+    pub summary: Option<String>,
+    pub location: Option<String>,
+    pub description: Option<String>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+    pub attendees: Option<Vec<String>>,
+}
+
 #[derive(Debug, Clone)]
 pub struct CalendarClient {
     inner: JsonClient,
@@ -91,6 +104,39 @@ impl CalendarClient {
             .filter(|item| item.status.as_deref() != Some("cancelled"))
             .map(CalendarEventResource::into_view)
             .collect())
+    }
+
+    /// Fetch a single event by id.
+    pub async fn get_event(
+        &self,
+        calendar_id: &str,
+        event_id: &str,
+        access_token: &str,
+    ) -> AppResult<EventView> {
+        let endpoint = format!("{}/{event_id}", events_endpoint(calendar_id));
+        let resource: CalendarEventResource =
+            self.inner.get_json(&endpoint, access_token, None).await?;
+        Ok(resource.into_view())
+    }
+
+    /// Patch only the fields set on `patch`, leaving everything else (including
+    /// the event id and any Meet conference) intact. Attendees receive a single
+    /// "updated event" email.
+    pub async fn patch_event(
+        &self,
+        calendar_id: &str,
+        event_id: &str,
+        patch: &EventPatch,
+        access_token: &str,
+    ) -> AppResult<EventView> {
+        let endpoint = format!("{}/{event_id}", events_endpoint(calendar_id));
+        let query = vec![("sendUpdates".to_string(), "all".to_string())];
+        let body = CalendarEventPatchRequest::from_patch(patch);
+        let resource: CalendarEventResource = self
+            .inner
+            .patch_json(&endpoint, access_token, &body, Some(&query))
+            .await?;
+        Ok(resource.into_view())
     }
 
     /// Delete an event, sending cancellation emails to all attendees.
@@ -164,6 +210,44 @@ impl CalendarEventRequest {
                 })
                 .collect(),
             conference_data,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CalendarEventPatchRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start: Option<CalendarEventTimeRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end: Option<CalendarEventTimeRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attendees: Option<Vec<CalendarAttendeeRequest>>,
+}
+
+impl CalendarEventPatchRequest {
+    /// Build the patch body, mapping only the fields set on the patch.
+    fn from_patch(patch: &EventPatch) -> Self {
+        Self {
+            summary: patch.summary.clone(),
+            location: patch.location.clone(),
+            description: patch.description.clone(),
+            start: patch.start.clone().map(|date_time| CalendarEventTimeRequest { date_time }),
+            end: patch.end.clone().map(|date_time| CalendarEventTimeRequest { date_time }),
+            attendees: patch.attendees.as_ref().map(|emails| {
+                emails
+                    .iter()
+                    .map(|email| CalendarAttendeeRequest {
+                        email: email.clone(),
+                    })
+                    .collect()
+            }),
         }
     }
 }

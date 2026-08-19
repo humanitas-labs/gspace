@@ -4,7 +4,7 @@ Google Workspace CLI toolbox. One crate, one OAuth flow, one profile system;
 each surface ships as its own binary:
 
 - **`gmail`** — Gmail: list, read, send, labels, attachments, aliases
-- **`gcal`** — Google Calendar: create events (with Google Meet links), list, delete
+- **`gcal`** — Google Calendar: create events (with Google Meet links), edit in place, list, delete
 
 Both binaries share profiles and tokens — `gcal --profile work` uses the
 same login as `gmail --profile work`. Install both with
@@ -72,6 +72,10 @@ gcal [--profile <name>] [--json]
       (--end <datetime> | --duration <mins, default 30>)
       [--attendees a@x.com,b@y.com] [--meet]
       [--location <text>] [--notes <text>] [--calendar <id>]
+  edit <event-id> [--title <t>]
+       [--start <datetime>] [--end <datetime> | --duration <mins>]
+       [--attendees a@x.com,b@y.com] [--location <text>] [--notes <text>]
+       [--calendar <id>]
   list [--today | --tomorrow | --week | --from <d> --to <d>]
        [--limit <n>] [--calendar <id>]
   rm <event-id> [--calendar <id>]
@@ -98,6 +102,20 @@ event created: Weekly sync
   attendees: alex@example.com
   meet: https://meet.google.com/abc-defg-hij
   event: https://www.google.com/calendar/event?eid=...
+```
+
+`gcal edit` updates an event in place (`events.patch`): only the fields you
+pass change, so the event id and Meet link survive and attendees get a single
+"updated event" email instead of a cancellation plus a new invite. `--start`
+alone shifts the event and keeps its duration; `--attendees` replaces the
+attendee list. Recurring-event editing is not supported.
+
+```console
+$ gcal edit k2j4... --start "tomorrow 11:00"
+event updated: Weekly sync
+  id: k2j4...
+  when: Sun 2026.07.26 11:00–11:30
+  ...
 ```
 
 Calendar access uses the `calendar.events` OAuth scope. Profiles authorized

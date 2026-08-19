@@ -54,6 +54,41 @@ mod calendar_under_test {
     }
 
     #[test]
+    fn patch_body_carries_only_set_fields() {
+        let patch = EventPatch {
+            summary: Some("renamed sync".to_string()),
+            start: Some("2026-07-28T11:00:00-07:00".to_string()),
+            end: Some("2026-07-28T11:30:00-07:00".to_string()),
+            ..EventPatch::default()
+        };
+        let body = serde_json::to_value(CalendarEventPatchRequest::from_patch(&patch))
+            .expect("body should serialize");
+
+        assert_eq!(body["summary"], "renamed sync");
+        assert_eq!(body["start"]["dateTime"], "2026-07-28T11:00:00-07:00");
+        assert_eq!(body["end"]["dateTime"], "2026-07-28T11:30:00-07:00");
+        assert!(body.get("location").is_none());
+        assert!(body.get("description").is_none());
+        assert!(body.get("attendees").is_none());
+    }
+
+    #[test]
+    fn patch_body_maps_attendee_emails() {
+        let patch = EventPatch {
+            attendees: Some(vec!["alex@example.com".to_string(), "sam@example.com".to_string()]),
+            ..EventPatch::default()
+        };
+        let body = serde_json::to_value(CalendarEventPatchRequest::from_patch(&patch))
+            .expect("body should serialize");
+
+        assert_eq!(body["attendees"][0]["email"], "alex@example.com");
+        assert_eq!(body["attendees"][1]["email"], "sam@example.com");
+        assert!(body.get("summary").is_none());
+        assert!(body.get("start").is_none());
+        assert!(body.get("end").is_none());
+    }
+
+    #[test]
     fn maps_timed_event_resource_to_view() {
         let resource: CalendarEventResource = serde_json::from_str(
             r#"{
