@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use reqwest::header::RETRY_AFTER;
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serde::Serialize;
@@ -5,6 +8,13 @@ use serde::de::DeserializeOwned;
 use url::Url;
 
 use crate::error::{AppError, AppResult};
+
+/// Retries after the first attempt for GETs that hit a rate limit or server error.
+const MAX_GET_RETRIES: u32 = 3;
+/// Backoff before the first retry; doubles on each subsequent one.
+const BASE_RETRY_DELAY: Duration = Duration::from_millis(250);
+/// Upper bound on any single wait, including a server-supplied `Retry-After`.
+const MAX_RETRY_DELAY: Duration = Duration::from_secs(8);
 
 /// Bearer-authenticated JSON transport shared by the Google API clients.
 ///
@@ -31,6 +41,9 @@ impl JsonClient {
     }
 
     /// Issue a GET with optional query params and deserialize the JSON body.
+    ///
+    /// GETs are idempotent, so 429 and 5xx responses are retried with backoff
+    /// (honoring `Retry-After`). Writes are never retried.
     pub async fn get_json<T: DeserializeOwned>(
         &self,
         endpoint: &str,
@@ -38,13 +51,26 @@ impl JsonClient {
         query: Option<&[(String, String)]>,
     ) -> AppResult<T> {
         let url = self.endpoint_url(endpoint)?;
-        let mut request = self.http.get(url).bearer_auth(access_token);
-        if let Some(query) = query {
-            request = request.query(query);
-        }
+        let mut attempt = 0;
+        loop {
+            let mut request = self.http.get(url.clone()).bearer_auth(access_token);
+            if let Some(query) = query {
+                request = request.query(query);
+            }
 
-        let response = request.send().await?;
-        self.parse_json_response(response).await
+            let response = request.send().await?;
+            if attempt < MAX_GET_RETRIES && is_retryable(response.status()) {
+                let retry_after = response
+                    .headers()
+                    .get(RETRY_AFTER)
+                    .and_then(|value| value.to_str().ok());
+                tokio::time::sleep(retry_delay(attempt, retry_after)).await;
+                attempt += 1;
+                continue;
+            }
+
+            return self.parse_json_response(response).await;
+        }
     }
 
     /// Issue a POST with a JSON body and optional query params, deserializing the response.
@@ -207,4 +233,51 @@ fn parse_api_error_message(body: &str) -> Option<String> {
     }
 
     Some(parts.join(", "))
+}
+
+/// Whether a GET response is transient: rate limited or a server-side failure.
+fn is_retryable(status: StatusCode) -> bool {
+    status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
+}
+
+/// Wait before retry number `attempt` (0-based): `Retry-After` seconds when the
+/// server sends them, otherwise exponential backoff; capped either way.
+fn retry_delay(attempt: u32, retry_after: Option<&str>) -> Duration {
+    let delay = retry_after
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(Duration::from_secs)
+        .unwrap_or_else(|| BASE_RETRY_DELAY * 2u32.pow(attempt));
+    delay.min(MAX_RETRY_DELAY)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retries_rate_limits_and_server_errors_only() {
+        assert!(is_retryable(StatusCode::TOO_MANY_REQUESTS));
+        assert!(is_retryable(StatusCode::INTERNAL_SERVER_ERROR));
+        assert!(is_retryable(StatusCode::SERVICE_UNAVAILABLE));
+        assert!(!is_retryable(StatusCode::NOT_FOUND));
+        assert!(!is_retryable(StatusCode::FORBIDDEN));
+        assert!(!is_retryable(StatusCode::OK));
+    }
+
+    #[test]
+    fn backoff_doubles_from_base() {
+        assert_eq!(retry_delay(0, None), Duration::from_millis(250));
+        assert_eq!(retry_delay(1, None), Duration::from_millis(500));
+        assert_eq!(retry_delay(2, None), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn honors_retry_after_seconds_with_cap() {
+        assert_eq!(retry_delay(0, Some("2")), Duration::from_secs(2));
+        assert_eq!(retry_delay(0, Some("120")), MAX_RETRY_DELAY);
+        assert_eq!(
+            retry_delay(1, Some("Wed, 21 Oct 2026 07:28:00 GMT")),
+            Duration::from_millis(500)
+        );
+    }
 }

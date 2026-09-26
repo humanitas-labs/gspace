@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.8.1] - 2026-09-26
+
+### Changed
+
+- `gmail list` fetches message metadata 25 at a time over a single HTTP/2 connection instead of one by one, keeping list order. 100 messages now take about 1–2s instead of 8–25s.
+- GET requests retry up to 3 times on 429 and 5xx responses, with exponential backoff that honors `Retry-After`. Writes are never retried.
+
 ## [0.8.0] - 2026-09-26
 
 ### Added

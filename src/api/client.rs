@@ -1,5 +1,6 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use futures_util::{StreamExt, TryStreamExt, stream};
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -16,6 +17,9 @@ use super::models::{
 use super::send_as;
 
 const GMAIL_API_BASE_URL: &str = "https://gmail.googleapis.com";
+/// Message fetches kept in flight by `list`; stays under Gmail's per-user
+/// concurrency and per-second quota limits.
+const LIST_CONCURRENCY: usize = 25;
 
 #[derive(Debug, Clone)]
 pub struct GmailClient {
@@ -91,7 +95,8 @@ impl GmailClient {
         decode_base64url(&data)
     }
 
-    /// List messages matching `query` (up to `limit`), fetching each one's metadata.
+    /// List messages matching `query` (up to `limit`), fetching each one's metadata
+    /// concurrently while preserving the list order.
     pub async fn list(
         &self,
         access_token: &str,
@@ -104,13 +109,11 @@ impl GmailClient {
             .get_json(endpoint, access_token, Some(&query_params))
             .await?;
 
-        let mut results = Vec::new();
-        for entry in list_resource.messages.unwrap_or_default() {
-            let message = self.get_msg(&entry.id, access_token).await?;
-            results.push(message);
-        }
-
-        Ok(results)
+        stream::iter(list_resource.messages.unwrap_or_default())
+            .map(|entry| async move { self.get_msg(&entry.id, access_token).await })
+            .buffered(LIST_CONCURRENCY)
+            .try_collect()
+            .await
     }
 
     /// Submit a base64url-encoded raw RFC 822 message, optionally into an existing thread.

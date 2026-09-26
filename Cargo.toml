@@ -1,6 +1,6 @@
 [package]
 name = "gspace"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2024"
 
 # The crate is the shared Google Workspace toolbox; each surface ships as its
@@ -14,11 +14,12 @@ base64 = "0.22.1"
 chrono = "0.4.41"
 clap = { version = "4.5.32", features = ["derive"] }
 dirs = "6.0.0"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 html-escape = "0.2.13"
 mime_guess = "2.0.5"
 pulldown-cmark = "0.13.0"
 rand = "0.8.5"
-reqwest = { version = "0.12.15", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12.15", default-features = false, features = ["http2", "json", "rustls-tls"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 sha2 = "0.10.8"
