@@ -121,3 +121,9 @@
 - [x] Share one OAuth client across profiles via `config.json`, with per-field profile overrides; login saves prompted client values to the shared config and creates missing profile files; signature writes touch only the raw profile file.
 - [x] `cargo fmt && cargo clippy --all-targets && cargo test` (76 passed; merge-fallback and legacy-config unit tests)
 - [x] Live: migrated local config, token refresh for work + personal via shared client, `signature set` on a scratch profile wrote no OAuth fields
+
+## Heap
+
+- [ ] Add integration tests with mocked Gmail responses.
+- [ ] Harden reply recipient inference and `References` handling.
+- [ ] Add attachment filename/content-type override flags.
