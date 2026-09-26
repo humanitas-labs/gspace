@@ -12,6 +12,8 @@ pub struct AppContext {
     profile_error: Option<String>,
     pub verbose: u8,
     pub paths: AppPaths,
+    /// Effective settings: the profile file merged over the shared OAuth client
+    /// in `config.json`. Read-only — writers load and save the raw profile file.
     pub settings: Settings,
     pub token_store: FileTokenStore,
     pub gmail_client: GmailClient,
@@ -42,7 +44,7 @@ impl AppContext {
             }
             Err(err) => return Err(err),
         };
-        let settings = config::load_settings(&paths, &profile)?;
+        let settings = config::load_settings(&paths, &profile)?.merged_with(&app_config);
         let token_store = FileTokenStore::new(paths.clone());
         let gmail_client = GmailClient::new();
         let calendar_client = CalendarClient::new();

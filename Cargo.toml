@@ -1,6 +1,6 @@
 [package]
 name = "gspace"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2024"
 
 # The crate is the shared Google Workspace toolbox; each surface ships as its

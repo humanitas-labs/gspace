@@ -115,3 +115,9 @@
 - [x] `cargo fmt && cargo check && cargo test` (asserted metadata-format view has
       no attachments)
 - [x] `cargo run -- get <id>` (live: 3 PDF attachments listed in text + JSON)
+
+## 2026-09-26
+
+- [x] Share one OAuth client across profiles via `config.json`, with per-field profile overrides; login saves prompted client values to the shared config and creates missing profile files; signature writes touch only the raw profile file.
+- [x] `cargo fmt && cargo clippy --all-targets && cargo test` (76 passed; merge-fallback and legacy-config unit tests)
+- [x] Live: migrated local config, token refresh for work + personal via shared client, `signature set` on a scratch profile wrote no OAuth fields

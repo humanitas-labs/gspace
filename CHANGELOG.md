@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow semver.
 
+## [0.8.0] - 2026-09-26
+
+### Added
+
+- Shared OAuth client: `client_id`, `client_secret`, and `redirect_uri` can live once in `config.json` and apply to every profile. Profile files may still set them as per-field overrides. `gmail auth login` saves prompted client values to `config.json` (or to the profile file when that profile names its own client), and a successful login creates the profile file if missing.
+
+### Changed
+
+- `config.json` is now written owner-only (0600) since it can hold the client secret.
+- Profile and app config files omit unset fields instead of writing `null`.
+- `gmail signature set|clear` write only the raw profile file, so shared OAuth values are never copied into a profile.
+
+Existing per-profile client settings keep working unchanged; moving them into `config.json` is optional and needs no re-login.
+
 ## [0.7.0] - 2026-08-19
 
 ### Added

@@ -126,7 +126,8 @@ Google Calendar API in the same GCP project as the Gmail API.
 ## Profiles
 
 Each account is a named profile with its own settings file
-(`profiles/<name>.json`) and token (`tokens/<name>.json`). Every command
+(`profiles/<name>.json`) and token (`tokens/<name>.json`); the OAuth client is
+shared across profiles via `config.json` (see [OAuth setup](#oauth-setup)). Every command
 resolves one profile in this order:
 
 1. `--profile <name>` flag
@@ -167,32 +168,35 @@ Stored as the `signature` field in the profile settings file.
 
 ## OAuth setup
 
+One OAuth client serves every profile. The client identifies the app, and each profile's token identifies the account, so profiles only need their own client in special cases.
+
 1. Create a Google Cloud OAuth client (Desktop app recommended).
-2. Enable Gmail API in your project.
-3. Add a profile file (default profile on macOS):
+2. Enable the Gmail API (and Calendar API for `gcal`) in your project.
+3. Run `gmail auth login`. When no client is configured it prompts for `client_id`, `client_secret`, and `redirect_uri`, and saves them to the shared `config.json`.
 
-```text
-~/Library/Application Support/gmail/profiles/default.json
-```
+The resulting layout on macOS (`~/Library/Application Support/gmail/`):
 
-4. Put your client config in that file:
-
-```json
+```jsonc
+// config.json — shared, owner-only (0600)
 {
+  "default_profile": "work",
   "client_id": "YOUR_CLIENT_ID",
   "client_secret": "YOUR_CLIENT_SECRET",
-  "redirect_uri": "http://127.0.0.1:8787/callback",
+  "redirect_uri": "http://127.0.0.1:8787/callback"
+}
+
+// profiles/work.json — per-account identity only
+{
   "sender_name": "Jane Doe",
   "send_from": "you@yourdomain.com"
 }
 ```
 
-`send_from` is optional: when set, sends default to that send-as alias
-(overridable per send with `--from`); when absent, sends come from the
-logged-in account's primary address.
+A profile file may also set `client_id`, `client_secret`, or `redirect_uri` to override the shared value, for example when a Workspace org only allows its own internal OAuth client. Each field falls back independently (profile, then `config.json`), so a profile that overrides `client_id` should set its own `client_secret` too. Prompted values for such a profile are saved to its own file.
 
-If either `client_id` or `client_secret` is missing, `gmail auth login` prompts for both and writes the profile file for you.
-If Google still rejects login with `client_secret is missing`, `gmail auth login` prompts for `client_secret`, saves it, and retries.
+`send_from` is optional: when set, sends default to that send-as alias (overridable per send with `--from`); when absent, sends come from the logged-in account's primary address.
+
+If Google still rejects login with `client_secret is missing`, `gmail auth login` prompts for `client_secret`, saves it, and retries. A successful login creates the profile file if it does not exist yet, so the profile shows up in `gmail profile list`.
 
 ## Login flow
 

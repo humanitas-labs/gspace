@@ -40,7 +40,7 @@ fn set(ctx: &AppContext, text: String) -> AppResult<()> {
     let signature = text.trim_matches(['\r', '\n']).to_string();
     let profile = ctx.profile()?;
 
-    let mut settings = ctx.settings.clone();
+    let mut settings = config::load_settings(&ctx.paths, profile)?;
     settings.signature = Some(signature.clone());
     config::save_settings(&ctx.paths, profile, &settings)?;
 
@@ -54,7 +54,7 @@ fn set(ctx: &AppContext, text: String) -> AppResult<()> {
 fn clear(ctx: &AppContext) -> AppResult<()> {
     let profile = ctx.profile()?;
 
-    let mut settings = ctx.settings.clone();
+    let mut settings = config::load_settings(&ctx.paths, profile)?;
     settings.signature = None;
     config::save_settings(&ctx.paths, profile, &settings)?;
 

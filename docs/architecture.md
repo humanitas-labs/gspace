@@ -38,9 +38,10 @@ One crate (`gspace`) hosting Google Workspace CLIs behind clear module boundarie
 
 ## State and storage
 
-- Profile settings path: `<config_dir>/gmail/profiles/<profile>.json`
+- Shared app config path: `<config_dir>/gmail/config.json` (default profile and the shared OAuth client)
+- Profile settings path: `<config_dir>/gmail/profiles/<profile>.json` (identity fields, optional OAuth overrides)
 - Token path: `<data_dir>/gmail/tokens/<profile>.json`
-- `AppContext` carries resolved profile, settings, token store, and API client.
+- `AppContext` carries resolved profile, settings, token store, and API client. `AppContext::settings` is the effective view (profile merged over the shared client) and is never written back; commands that persist settings load and save the raw profile file.
 
 ## OAuth details
 
